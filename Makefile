@@ -45,7 +45,7 @@ setup/git/hooks:
 
 .PHONY: code/run
 code/run:
-	@operator-sdk up local --namespace="${NAMESPACE}"
+	@operator-sdk run --local --namespace="${NAMESPACE}"
 
 .PHONY: code/run/service_account
 code/run/service_account: setup/service_account
