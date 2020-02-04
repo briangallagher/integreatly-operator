@@ -36,6 +36,9 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/metrics"
 	"github.com/operator-framework/operator-sdk/pkg/restmapper"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
+
+	rbac "sigs.k8s.io/controller-tools/pkg/rbac"
+	crd "sigs.k8s.io/controller-tools/pkg/crd"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -44,6 +47,8 @@ var (
 	metricsPort         int32 = 8383
 	operatorMetricsPort int32 = 8686
 	products            []string
+	a                   rbac.Rule
+	b					crd.ErrorRecorder
 )
 
 // Custom metrics

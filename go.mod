@@ -31,15 +31,16 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-openapi v0.0.0-20190918143330-0270cf2f1c1d
 	sigs.k8s.io/controller-runtime v0.4.0
+	sigs.k8s.io/controller-tools v0.2.4
 )
 
-// Pinned to kubernetes-1.15.4
+// Pinned to kubernetes-1.16.2
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.2.0+incompatible
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20191022152013-2823239d2298
-	//github.com/operator-framework/operator-sdk => github.com/erdrix/operator-sdk v0.15.0-pr137
+	github.com/operator-framework/operator-sdk => github.com/erdrix/operator-sdk v0.15.1-0.20200127101033-558b73ea8d0f
 	k8s.io/api => k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918201827-3de75813f604
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
 	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190918200908-1e17798da8c1
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.0.0-20190918202139-0b14c719ca62
@@ -60,8 +61,9 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918202012-3c1ca76f5bda
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918201353-5cc279503896
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.3.0
-//sigs.k8s.io/controller-tools => github.com/erdrix/controller-tools v0.2.4-pr137
 )
+
+replace sigs.k8s.io/controller-tools => github.com/erdrix/controller-tools v0.2.4-pr137
 
 replace github.com/openshift/api => github.com/openshift/api v3.9.1-0.20190904142825-922d36944de3+incompatible
 
