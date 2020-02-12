@@ -204,7 +204,7 @@ func (r *ReconcileInstallation) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	if installation.Status.Stages == nil {
-		installation.Status.Stages = map[integreatlyv1alpha1.StageName]*integreatlyv1alpha1.InstallationStageStatus{}
+		installation.Status.Stages = map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.InstallationStageStatus{}
 	}
 
 	// If the CR is being deleted, cancel the current context
@@ -260,9 +260,9 @@ func (r *ReconcileInstallation) Reconcile(request reconcile.Request) (reconcile.
 		}
 
 		if installation.Status.Stages == nil {
-			installation.Status.Stages = make(map[integreatlyv1alpha1.StageName]*integreatlyv1alpha1.InstallationStageStatus)
+			installation.Status.Stages = make(map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.InstallationStageStatus)
 		}
-		installation.Status.Stages[stage.Name] = &integreatlyv1alpha1.InstallationStageStatus{
+		installation.Status.Stages[stage.Name] = integreatlyv1alpha1.InstallationStageStatus{
 			Name:     stage.Name,
 			Phase:    stagePhase,
 			Products: stage.Products,
@@ -427,7 +427,7 @@ func (r *ReconcileInstallation) processStage(installation *integreatlyv1alpha1.I
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("could not create server client: %w", err)
 		}
-		product.Status, err = reconciler.Reconcile(r.context, installation, product, serverClient)
+		product.Status, err = reconciler.Reconcile(r.context, installation, &product, serverClient)
 		if err != nil {
 			if mErr == nil {
 				mErr = &multiErr{}
