@@ -1,7 +1,11 @@
 package config
 
 import (
+	"errors"
 	apicurio "github.com/apicurio/apicurio-operators/apicurito/pkg/apis/apicur/v1alpha1"
+	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Apicurio struct {
@@ -9,98 +13,71 @@ type Apicurio struct {
 }
 
 func NewApicurio(config ProductConfig) *Apicurio {
-	apicurio.Spec.Size
 	return &Apicurio{Config: config}
 }
 
-//
-////GetWatchableCRDs to trigger a reconcile of the integreatly installation when these are updated
-//func (r *Apicurio) GetWatchableCRDs() []runtime.Object {
-//	return []runtime.Object{
-//		&keycloak.Keycloak{
-//			TypeMeta: metav1.TypeMeta{
-//				Kind:       "Keycloak",
-//				APIVersion: keycloak.SchemeGroupVersion.String(),
-//			},
-//		},
-//	}
-//}
-//
-//func (r *RHSSO) GetNamespace() string {
-//	return r.Config["NAMESPACE"]
-//}
-//
-//func (r *RHSSO) SetNamespace(newNamespace string) {
-//	r.Config["NAMESPACE"] = newNamespace
-//}
-//
-//func (r *RHSSO) GetOperatorNamespace() string {
-//	return r.Config["NAMESPACE"] + "-operator"
-//}
-//
-//func (r *RHSSO) GetRealm() string {
-//	return r.Config["REALM"]
-//}
-//
-//func (r *RHSSO) SetRealm(newRealm string) {
-//	r.Config["REALM"] = newRealm
-//}
-//
-//func (r *RHSSO) GetHost() string {
-//	return r.Config["HOST"]
-//}
-//
-//func (r *RHSSO) SetHost(newHost string) {
-//	r.Config["HOST"] = newHost
-//}
-//
-//func (r *RHSSO) Read() ProductConfig {
-//	return r.Config
-//}
-//
-//func (r *RHSSO) GetLabelSelector() string {
-//	return "middleware"
-//}
-//
-//func (r *RHSSO) GetTemplateList() []string {
-//	templateList := []string{
-//		"kube_state_metrics_rhsso_alerts.yaml",
-//	}
-//	return templateList
-//}
-//
-//func (r *RHSSO) GetProductName() integreatlyv1alpha1.ProductName {
-//	return integreatlyv1alpha1.ProductRHSSO
-//}
-//
-//func (r *RHSSO) GetProductVersion() integreatlyv1alpha1.ProductVersion {
-//	return integreatlyv1alpha1.ProductVersion(r.Config["VERSION"])
-//}
-//
-//func (r *RHSSO) GetOperatorVersion() integreatlyv1alpha1.OperatorVersion {
-//	return integreatlyv1alpha1.OperatorVersionRHSSO
-//}
-//
-//func (r *RHSSO) SetProductVersion(version string) {
-//	r.Config["VERSION"] = version
-//}
-//
-//func (r *RHSSO) SetOperatorVersion(operator string) {
-//	r.Config["OPERATOR"] = operator
-//}
-//
-//func (r *RHSSO) Validate() error {
-//	if r.GetProductName() == "" {
-//		return errors.New("config product name is not defined")
-//	}
-//	if r.GetRealm() == "" {
-//		return errors.New("config realm is not defined")
-//	}
-//	if r.GetNamespace() == "" {
-//		return errors.New("config namespace is not defined")
-//	}
-//	if r.GetHost() == "" {
-//		return errors.New("config url is not defined")
-//	}
-//	return nil
-//}
+//GetWatchableCRDs to trigger a reconcile of the integreatly installation when these are updated
+func (r *Apicurio) GetWatchableCRDs() []runtime.Object {
+	return []runtime.Object{
+		&apicurio.Apicurito{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Apicurito",
+				APIVersion: apicurio.SchemeGroupVersion.String(),
+			},
+		},
+	}
+}
+
+func (r *Apicurio) GetNamespace() string {
+	return r.Config["NAMESPACE"]
+}
+
+func (r *Apicurio) SetNamespace(newNamespace string) {
+	r.Config["NAMESPACE"] = newNamespace
+}
+
+func (r *Apicurio) GetOperatorNamespace() string {
+	return r.Config["NAMESPACE"] + "-operator"
+}
+
+func (r *Apicurio) Read() ProductConfig {
+	return r.Config
+}
+
+func (r *Apicurio) GetProductName() integreatlyv1alpha1.ProductName {
+	return integreatlyv1alpha1.ProductRHSSO
+}
+
+func (r *Apicurio) GetProductVersion() integreatlyv1alpha1.ProductVersion {
+	return integreatlyv1alpha1.ProductVersion(r.Config["VERSION"])
+}
+
+func (r *Apicurio) GetOperatorVersion() integreatlyv1alpha1.OperatorVersion {
+	return integreatlyv1alpha1.OperatorVersionRHSSO
+}
+
+func (r *Apicurio) SetProductVersion(version string) {
+	r.Config["VERSION"] = version
+}
+
+func (r *Apicurio) SetOperatorVersion(operator string) {
+	r.Config["OPERATOR"] = operator
+}
+
+func (c *Apicurio) GetHost() string {
+	return c.Config["HOST"]
+}
+
+func (c *Apicurio) SetHost(newHost string) {
+	c.Config["HOST"] = newHost
+}
+
+func (r *Apicurio) Validate() error {
+	if r.GetProductName() == "" {
+		return errors.New("config product name is not defined")
+	}
+	if r.GetNamespace() == "" {
+		return errors.New("config namespace is not defined")
+	}
+	return nil
+}
