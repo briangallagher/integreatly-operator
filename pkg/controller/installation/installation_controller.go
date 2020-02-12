@@ -197,14 +197,14 @@ func (r *ReconcileInstallation) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 
+	if installation.Status.Stages == nil {
+		installation.Status.Stages = map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.InstallationStageStatus{}
+	}
+
 	// either not checked, or rechecking preflight checks
 	if installation.Status.PreflightStatus == integreatlyv1alpha1.PreflightInProgress ||
 		installation.Status.PreflightStatus == integreatlyv1alpha1.PreflightFail {
 		return r.preflightChecks(installation, installType, configManager)
-	}
-
-	if installation.Status.Stages == nil {
-		installation.Status.Stages = map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.InstallationStageStatus{}
 	}
 
 	// If the CR is being deleted, cancel the current context

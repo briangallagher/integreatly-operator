@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 
+	"github.com/integr8ly/integreatly-operator/pkg/products/apicurio"
 	"github.com/integr8ly/integreatly-operator/pkg/products/monitoring"
 
 	"net/http"
@@ -79,6 +80,8 @@ func NewReconciler(product integreatlyv1alpha1.ProductName, rc *rest.Config, con
 		reconciler, err = solutionexplorer.NewReconciler(configManager, installation, oauthv1Client, mpm, oauthResolver, recorder)
 	case integreatlyv1alpha1.ProductMonitoring:
 		reconciler, err = monitoring.NewReconciler(configManager, installation, mpm, recorder)
+	case integreatlyv1alpha1.ProductApicurio:
+		reconciler, err = apicurio.NewReconciler(configManager, installation, mpm, recorder)
 	case integreatlyv1alpha1.Product3Scale:
 		appsv1, err := appsv1Client.NewForConfig(rc)
 		if err != nil {

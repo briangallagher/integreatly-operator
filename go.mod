@@ -6,7 +6,6 @@ require (
 	github.com/3scale/3scale-operator v0.4.0
 	github.com/RHsyseng/operator-utils v0.0.0-20200107144857-313dbcf0e3bd
 	github.com/aerogear/unifiedpush-operator v0.0.0-20191212165307-3ea5e7aa705f
-	github.com/apicurio/apicurio-operators/apicurito v0.0.0-20200128092439-608224698902
 	github.com/coreos/prometheus-operator v0.34.0
 	github.com/eclipse/che-operator v0.0.0-20191122191946-81d08d3f0fde
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
@@ -27,6 +26,7 @@ require (
 	github.com/syndesisio/syndesis/install/operator v0.0.0-20191213102841-4a0767cba149
 	gopkg.in/yaml.v2 v2.2.4
 	k8s.io/api v0.17.0
+	k8s.io/apiextensions-apiserver v0.17.0 // indirect
 	k8s.io/apimachinery v0.17.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
