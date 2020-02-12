@@ -1,0 +1,100 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: kafkas.kafka.strimzi.io
+spec:
+  group: kafka.strimzi.io
+  names:
+    kind: Kafka
+    listKind: KafkaList
+    plural: kafkas
+    singular: kafka
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      description: Installation is the Schema for the installations API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: InstallationSpec defines the desired state of Installation
+          properties:
+            entityOperator:
+              properties:
+                topicOperator:
+                  type: object
+                userOperator:
+                  type: object
+              required:
+              - topicOperator
+              - userOperator
+              type: object
+            kafka:
+              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                Important: Run "operator-sdk generate k8s" to regenerate code after
+                modifying this file Add custom validation using kubebuilder tags:
+                https://book.kubebuilder.io/beyond_basics/generating_crd.html'
+              properties:
+                config:
+                  properties:
+                    log.message.format.version:
+                      type: string
+                    offsets.topic.replication.factor:
+                      type: string
+                    transaction.state.log.min.isr:
+                      type: string
+                    transaction.state.log.replication.factor:
+                      type: string
+                  type: object
+                listeners:
+                  additionalProperties:
+                    type: object
+                  type: object
+                replicas:
+                  type: integer
+                storage:
+                  properties:
+                    deleteClaim:
+                      type: boolean
+                    size:
+                      type: string
+                    type:
+                      type: string
+                  type: object
+                version:
+                  type: string
+              type: object
+            zookeeper:
+              properties:
+                replicas:
+                  type: integer
+                storage:
+                  properties:
+                    deleteClaim:
+                      type: boolean
+                    size:
+                      type: string
+                    type:
+                      type: string
+                  type: object
+              type: object
+          type: object
+        status:
+          description: InstallationStatus defines the observed state of Installation
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true

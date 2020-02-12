@@ -107,17 +107,9 @@ func (in *InstallationStageStatus) DeepCopyInto(out *InstallationStageStatus) {
 	*out = *in
 	if in.Products != nil {
 		in, out := &in.Products, &out.Products
-		*out = make(map[ProductName]*InstallationProductStatus, len(*in))
+		*out = make(map[ProductName]InstallationProductStatus, len(*in))
 		for key, val := range *in {
-			var outVal *InstallationProductStatus
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				in, out := &val, &outVal
-				*out = new(InstallationProductStatus)
-				**out = **in
-			}
-			(*out)[key] = outVal
+			(*out)[key] = val
 		}
 	}
 	return
@@ -138,17 +130,9 @@ func (in *InstallationStatus) DeepCopyInto(out *InstallationStatus) {
 	*out = *in
 	if in.Stages != nil {
 		in, out := &in.Stages, &out.Stages
-		*out = make(map[StageName]*InstallationStageStatus, len(*in))
+		*out = make(map[StageName]InstallationStageStatus, len(*in))
 		for key, val := range *in {
-			var outVal *InstallationStageStatus
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				in, out := &val, &outVal
-				*out = new(InstallationStageStatus)
-				(*in).DeepCopyInto(*out)
-			}
-			(*out)[key] = outVal
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	return

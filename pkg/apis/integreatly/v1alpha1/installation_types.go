@@ -109,17 +109,17 @@ type InstallationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
-	Stages             map[StageName]*InstallationStageStatus `json:"stages"`
-	PreflightStatus    PreflightStatus                        `json:"preflightStatus,omitempty"`
-	PreflightMessage   string                                 `json:"preflightMessage,omitempty"`
-	LastError          string                                 `json:"lastError"`
-	SetupGHCredentials bool                                   `json:"setupGHCredentials,omitempty"`
+	Stages             map[StageName]InstallationStageStatus `json:"stages"`
+	PreflightStatus    PreflightStatus                       `json:"preflightStatus,omitempty"`
+	PreflightMessage   string                                `json:"preflightMessage,omitempty"`
+	LastError          string                                `json:"lastError"`
+	SetupGHCredentials bool                                  `json:"setupGHCredentials,omitempty"`
 }
 
 type InstallationStageStatus struct {
-	Name     StageName                                  `json:"name"`
-	Phase    StatusPhase                                `json:"phase"`
-	Products map[ProductName]*InstallationProductStatus `json:"products,omitempty"`
+	Name     StageName                                 `json:"name"`
+	Phase    StatusPhase                               `json:"phase"`
+	Products map[ProductName]InstallationProductStatus `json:"products,omitempty"`
 }
 
 type InstallationProductStatus struct {
@@ -149,7 +149,7 @@ type Installation struct {
 func (i *Installation) GetProductStatusObject(product ProductName) *InstallationProductStatus {
 	for _, stage := range i.Status.Stages {
 		if product, ok := stage.Products[product]; ok {
-			return product
+			return &product
 		}
 	}
 	return &InstallationProductStatus{

@@ -1,0 +1,330 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: authenticationservices.admin.enmasse.io
+spec:
+  group: admin.enmasse.io
+  names:
+    kind: AuthenticationService
+    listKind: AuthenticationServiceList
+    plural: authenticationservices
+    singular: authenticationservice
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            external:
+              properties:
+                allowOverride:
+                  type: boolean
+                caCertSecret:
+                  description: SecretReference represents a Secret Reference. It has
+                    enough information to retrieve secret in any namespace
+                  properties:
+                    name:
+                      description: Name is unique within a namespace to reference
+                        a secret resource.
+                      type: string
+                    namespace:
+                      description: Namespace defines the space within which the secret
+                        name must be unique.
+                      type: string
+                  type: object
+                clientCertSecret:
+                  description: SecretReference represents a Secret Reference. It has
+                    enough information to retrieve secret in any namespace
+                  properties:
+                    name:
+                      description: Name is unique within a namespace to reference
+                        a secret resource.
+                      type: string
+                    namespace:
+                      description: Namespace defines the space within which the secret
+                        name must be unique.
+                      type: string
+                  type: object
+                host:
+                  type: string
+                port:
+                  type: integer
+              required:
+              - host
+              - port
+              type: object
+            none:
+              properties:
+                certificateSecret:
+                  description: SecretReference represents a Secret Reference. It has
+                    enough information to retrieve secret in any namespace
+                  properties:
+                    name:
+                      description: Name is unique within a namespace to reference
+                        a secret resource.
+                      type: string
+                    namespace:
+                      description: Namespace defines the space within which the secret
+                        name must be unique.
+                      type: string
+                  type: object
+                image:
+                  properties:
+                    name:
+                      type: string
+                    pullPolicy:
+                      description: PullPolicy describes a policy for if/when to pull
+                        a container image
+                      type: string
+                  required:
+                  - name
+                  type: object
+                resources:
+                  description: ResourceRequirements describes the compute resource
+                    requirements.
+                  properties:
+                    limits:
+                      additionalProperties:
+                        type: string
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
+                    requests:
+                      additionalProperties:
+                        type: string
+                      description: 'Requests describes the minimum amount of compute
+                        resources required. If Requests is omitted for a container,
+                        it defaults to Limits if that is explicitly specified, otherwise
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
+                  type: object
+              type: object
+            realm:
+              type: string
+            standard:
+              properties:
+                certificateSecret:
+                  description: SecretReference represents a Secret Reference. It has
+                    enough information to retrieve secret in any namespace
+                  properties:
+                    name:
+                      description: Name is unique within a namespace to reference
+                        a secret resource.
+                      type: string
+                    namespace:
+                      description: Namespace defines the space within which the secret
+                        name must be unique.
+                      type: string
+                  type: object
+                credentialsSecret:
+                  description: SecretReference represents a Secret Reference. It has
+                    enough information to retrieve secret in any namespace
+                  properties:
+                    name:
+                      description: Name is unique within a namespace to reference
+                        a secret resource.
+                      type: string
+                    namespace:
+                      description: Namespace defines the space within which the secret
+                        name must be unique.
+                      type: string
+                  type: object
+                datasource:
+                  properties:
+                    credentialsSecret:
+                      description: SecretReference represents a Secret Reference.
+                        It has enough information to retrieve secret in any namespace
+                      properties:
+                        name:
+                          description: Name is unique within a namespace to reference
+                            a secret resource.
+                          type: string
+                        namespace:
+                          description: Namespace defines the space within which the
+                            secret name must be unique.
+                          type: string
+                      type: object
+                    database:
+                      type: string
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    type:
+                      type: string
+                  required:
+                  - type
+                  type: object
+                deploymentName:
+                  type: string
+                image:
+                  properties:
+                    name:
+                      type: string
+                    pullPolicy:
+                      description: PullPolicy describes a policy for if/when to pull
+                        a container image
+                      type: string
+                  required:
+                  - name
+                  type: object
+                initImage:
+                  properties:
+                    name:
+                      type: string
+                    pullPolicy:
+                      description: PullPolicy describes a policy for if/when to pull
+                        a container image
+                      type: string
+                  required:
+                  - name
+                  type: object
+                jvmOptions:
+                  type: string
+                resources:
+                  description: ResourceRequirements describes the compute resource
+                    requirements.
+                  properties:
+                    limits:
+                      additionalProperties:
+                        type: string
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
+                    requests:
+                      additionalProperties:
+                        type: string
+                      description: 'Requests describes the minimum amount of compute
+                        resources required. If Requests is omitted for a container,
+                        it defaults to Limits if that is explicitly specified, otherwise
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                      type: object
+                  type: object
+                routeName:
+                  type: string
+                serviceAccountName:
+                  type: string
+                serviceName:
+                  type: string
+                storage:
+                  properties:
+                    claimName:
+                      type: string
+                    class:
+                      type: string
+                    deleteClaim:
+                      type: boolean
+                    selector:
+                      description: A label selector is a label query over a set of
+                        resources. The result of matchLabels and matchExpressions
+                        are ANDed. An empty label selector matches all objects. A
+                        null label selector matches no objects.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                    size:
+                      type: string
+                    type:
+                      type: string
+                  required:
+                  - type
+                  type: object
+              type: object
+            type:
+              type: string
+          required:
+          - type
+          type: object
+        status:
+          properties:
+            caCertSecret:
+              description: SecretReference represents a Secret Reference. It has enough
+                information to retrieve secret in any namespace
+              properties:
+                name:
+                  description: Name is unique within a namespace to reference a secret
+                    resource.
+                  type: string
+                namespace:
+                  description: Namespace defines the space within which the secret
+                    name must be unique.
+                  type: string
+              type: object
+            clientCertSecret:
+              description: SecretReference represents a Secret Reference. It has enough
+                information to retrieve secret in any namespace
+              properties:
+                name:
+                  description: Name is unique within a namespace to reference a secret
+                    resource.
+                  type: string
+                namespace:
+                  description: Namespace defines the space within which the secret
+                    name must be unique.
+                  type: string
+              type: object
+            host:
+              type: string
+            port:
+              type: integer
+          type: object
+      required:
+      - spec
+      - status
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true

@@ -1,0 +1,143 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: addressspaces.enmasse.io
+spec:
+  group: enmasse.io
+  names:
+    kind: AddressSpace
+    listKind: AddressSpaceList
+    plural: addressspaces
+    singular: addressspace
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            authenticationService:
+              properties:
+                details:
+                  description: RawMessage is a raw encoded JSON value. It implements
+                    Marshaler and Unmarshaler and can be used to delay JSON decoding
+                    or precompute a JSON encoding.
+                  format: byte
+                  type: string
+                type:
+                  type: string
+              required:
+              - type
+              type: object
+            endpoints:
+              items:
+                properties:
+                  cert:
+                    properties:
+                      provider:
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  expose:
+                    properties:
+                      route:
+                        type: string
+                      routeServicePort:
+                        type: string
+                      routeTlsTermination:
+                        type: string
+                    required:
+                    - route
+                    - routeServicePort
+                    - routeTlsTermination
+                    type: object
+                  name:
+                    type: string
+                  service:
+                    type: string
+                required:
+                - name
+                - service
+                type: object
+              type: array
+            plan:
+              type: string
+            type:
+              type: string
+          required:
+          - plan
+          - type
+          type: object
+        status:
+          properties:
+            caCert:
+              format: byte
+              type: string
+            endpointStatuses:
+              items:
+                properties:
+                  cert:
+                    format: byte
+                    type: string
+                  externalHost:
+                    type: string
+                  externalPorts:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - name
+                      - port
+                      type: object
+                    type: array
+                  name:
+                    type: string
+                  serviceHost:
+                    type: string
+                  servicePorts:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - name
+                      - port
+                      type: object
+                    type: array
+                required:
+                - externalHost
+                - name
+                - serviceHost
+                type: object
+              type: array
+            isReady:
+              type: boolean
+          required:
+          - isReady
+          type: object
+      required:
+      - spec
+      - status
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true

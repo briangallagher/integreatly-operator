@@ -72,10 +72,45 @@ spec:
             setupGHCredentials:
               type: boolean
             stages:
+              additionalProperties:
+                properties:
+                  name:
+                    type: string
+                  phase:
+                    type: string
+                  products:
+                    additionalProperties:
+                      properties:
+                        host:
+                          type: string
+                        mobile:
+                          type: boolean
+                        name:
+                          type: string
+                        operator:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - host
+                      - name
+                      - status
+                      - version
+                      type: object
+                    type: object
+                required:
+                - name
+                - phase
+                type: object
               description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                 of cluster Important: Run "operator-sdk generate k8s" to regenerate
                 code after modifying this file Add custom validation using kubebuilder
                 tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html'
+              type: object
           required:
           - lastError
           - stages
