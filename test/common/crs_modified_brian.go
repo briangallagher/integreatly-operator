@@ -46,7 +46,7 @@ func (apw AddressPlanCrWrapper) modifyReservedField() {
 }
 
 func (apw AddressPlanCrWrapper) verifyModifyOnReservedField() bool {
-	// Only checking one field
+	// NOTE: Only checking one field
 	return apw.cr.Spec.AddressType != "Changed-Valued"
 }
 
@@ -64,12 +64,10 @@ func getAddressSpacePlanCr(ctx *TestingContext) AddressPlanCrWrapper {
 func testAMQOnlineCrs(t *testing.T, ctx *TestingContext, wg *sync.WaitGroup) {
 	testCrUpdates(t, ctx, getAddressSpacePlanCr(ctx))
 
-	//testAddressPlan(wg, t, ctx)
-	//testAuthenticationServiceCr(wg, t, ctx)
-	//testBrokeredInfraConfigCr(wg, t, ctx)
-	//testStandardInfraConfigCr(wg, t, ctx)
-	//testRoleCr(wg, t, ctx)
-	//testRoleBindingCr(wg, t, ctx)
+	// TODO:
+	//testCrUpdates(t, ctx, getAuthenticationServiceCr(ctx))
+	//testCrUpdates(t, ctx, getBrokeredInfraConfigCr(ctx))
+	// etc
 }
 
 // Resource Version is on v1.ObjectMeta so can be generic method
