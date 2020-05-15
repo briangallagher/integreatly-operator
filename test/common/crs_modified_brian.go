@@ -8,10 +8,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
 	"testing"
 	"time"
 )
+
+// TODO: Further enhancements: Make all the changes at the same time and just call one update on the CR
+// Then verify all changes
+
+// NOTES: We only need to test one CR per type
+// We only need to check modification patterns and not all fields. Meaning, we check that a reserved field
+// will be reconciled as apposed to checking all reserved fields.
 
 const (
 	RetryInterval = time.Second * 5
@@ -23,10 +29,10 @@ type CrWrapper interface {
 	getCr() (runtime.Object, v1.ObjectMeta)
 	modifyReservedField()
 	verifyModifyOnReservedField() bool
-	//verifyModifyOnOpenField() bool			// TODO:
-	//verifyDeleteOnReservedField() bool		// TODO:
-	//verifyDeleteOnOpenField() bool			// TODO:
-	//verifyAddField() bool						// TODO:
+	addNewField()
+	verifyAddNewField() bool
+	deleteReservedField()
+	verifyDeleteReservedField() bool
 }
 
 // ************************************************************************************
@@ -45,6 +51,24 @@ func (apw AddressPlanCrWrapper) modifyReservedField() {
 	apw.cr.Spec.AddressType = "Changed-Valued"
 }
 
+// Add a field not under the control of the reconciler
+func (apw AddressPlanCrWrapper) addNewField() {
+	apw.cr.Spec.Partitions = 1234
+}
+
+func (apw AddressPlanCrWrapper) verifyAddNewField() bool {
+	return apw.cr.Spec.Partitions == 1234
+}
+
+// TODO: is this the same as modify? Can not set a string to nil
+func (apw AddressPlanCrWrapper) deleteReservedField() {
+	apw.cr.Spec.DisplayName = ""
+}
+
+func (apw AddressPlanCrWrapper) verifyDeleteReservedField() bool {
+	return apw.cr.Spec.DisplayName != ""
+}
+
 func (apw AddressPlanCrWrapper) verifyModifyOnReservedField() bool {
 	// NOTE: Only checking one field
 	return apw.cr.Spec.AddressType != "Changed-Valued"
@@ -61,7 +85,7 @@ func getAddressSpacePlanCr(ctx *TestingContext) AddressPlanCrWrapper {
 // Generic Functions
 // ************************************************************************************
 
-func testAMQOnlineCrs(t *testing.T, ctx *TestingContext, wg *sync.WaitGroup) {
+func TestAMQOnlineCrs(t *testing.T, ctx *TestingContext) {
 	testCrUpdates(t, ctx, getAddressSpacePlanCr(ctx))
 
 	// TODO:
@@ -78,14 +102,26 @@ func getResourceVersion(crWrapper CrWrapper) string {
 
 func testCrUpdates(t *testing.T, ctx *TestingContext, crWrapper CrWrapper) {
 	testModifyReservedField(t, ctx, crWrapper)
-	// testModifyOpenField(t, ctx, crWrapper)  		// TODO:
-	// testDeleteReservedField(t, ctx, crWrapper) 	// TODO:
-	// testDeleteOpenField(t, ctx, crWrapper) 		// TODO:
-	// addNewCRValues(t, ctx, rt, crData)			// TODO:
+	addNewCRValues(t, ctx, crWrapper)
+	testDeleteReservedField(t, ctx, crWrapper)
+}
+
+func addNewCRValues(t *testing.T, ctx *TestingContext, crWrapper CrWrapper) {
+	crWrapper.addNewField()
+	resourceVersion := getResourceVersion(crWrapper)
+	updateCr(t, ctx, crWrapper)
+	verifyUpdatedCr(t, ctx, crWrapper, crWrapper.verifyModifyOnReservedField, resourceVersion, RetryCount)
 }
 
 func testModifyReservedField(t *testing.T, ctx *TestingContext, crWrapper CrWrapper) {
 	crWrapper.modifyReservedField()
+	resourceVersion := getResourceVersion(crWrapper)
+	updateCr(t, ctx, crWrapper)
+	verifyUpdatedCr(t, ctx, crWrapper, crWrapper.verifyModifyOnReservedField, resourceVersion, RetryCount)
+}
+
+func testDeleteReservedField(t *testing.T, ctx *TestingContext, crWrapper CrWrapper) {
+	crWrapper.deleteReservedField()
 	resourceVersion := getResourceVersion(crWrapper)
 	updateCr(t, ctx, crWrapper)
 	verifyUpdatedCr(t, ctx, crWrapper, crWrapper.verifyModifyOnReservedField, resourceVersion, RetryCount)
