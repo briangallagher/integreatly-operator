@@ -86,11 +86,13 @@ func getAddressSpacePlanCr(ctx *TestingContext) AddressPlanCrWrapper {
 // ************************************************************************************
 
 func TestAMQOnlineCrs(t *testing.T, ctx *TestingContext) {
+	// TODO: test using go routines
+	//go testCrUpdates(t, ctx, getAddressSpacePlanCr(ctx))
 	testCrUpdates(t, ctx, getAddressSpacePlanCr(ctx))
 
 	// TODO:
-	//testCrUpdates(t, ctx, getAuthenticationServiceCr(ctx))
-	//testCrUpdates(t, ctx, getBrokeredInfraConfigCr(ctx))
+	//go testCrUpdates(t, ctx, getAuthenticationServiceCr(ctx))
+	//go testCrUpdates(t, ctx, getBrokeredInfraConfigCr(ctx))
 	// etc
 }
 
