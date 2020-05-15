@@ -15,6 +15,11 @@ import (
 // TODO: Further enhancements: Make all the changes at the same time and just call one update on the CR
 // Then verify all changes
 
+// TODO: Problem: From running this test it seems like the data is not being reverted as expected
+// The addressType does not revert. Possibly because it is not under the control of the reconciler
+// It seems like there should be validation on saving the CR to inform the user that the values
+// are invalid
+
 // NOTES: We only need to test one CR per type
 // We only need to check modification patterns and not all fields. Meaning, we check that a reserved field
 // will be reconciled as apposed to checking all reserved fields.
