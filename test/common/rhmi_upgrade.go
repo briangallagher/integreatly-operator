@@ -36,6 +36,23 @@ func TestUpgradeVersions(t *testing.T, ctx *TestingContext) {
 
 	t.Logf("Test rhmi upgrades, preUpgrade: %s, postUpgrade: %s, currentRhmiVersion: %s, targetRhmiVersion: %s", preUpgrade, postUpgrade, currentRhmiVersion, targetRhmiVersion)
 
+	// get console master url
+	rhmi, err := getRHMI(ctx.Client)
+	if err != nil {
+		t.Fatalf("error getting RHMI CR: %v", err)
+	}
+
+	// TODO: uncomment when appropriate, see comments above
+	//if preUpgrade == "true" {
+	//	if rhmi.Status.Version == "" {
+	//		t.Fatal("Version should be not empty pre upgrade")
+	//	}
+	//
+	//	if rhmi.Status.ToVersion != "" {
+	//		t.Fatal("ToVersion should be empty pre upgrade")
+	//	}
+	//}
+
 	if postUpgrade == "true" {
 
 		// Verify the RHMI versions during the upgrade
@@ -49,12 +66,6 @@ func TestUpgradeVersions(t *testing.T, ctx *TestingContext) {
 		}
 
 		// Verify the RHMI versions now
-
-		// get console master url
-		rhmi, err := getRHMI(ctx.Client)
-		if err != nil {
-			t.Fatalf("error getting RHMI CR: %v", err)
-		}
 
 		if rhmi.Status.ToVersion != "" {
 			t.Fatal("ToVersion should be empty post upgrade")
