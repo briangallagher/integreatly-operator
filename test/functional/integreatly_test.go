@@ -59,4 +59,22 @@ func TestIntegreatly(t *testing.T) {
 			})
 		}
 	})
+
+	// Do not execute these tests unless UPGRADE_TESTING is set to true
+	if os.Getenv("UPGRADE_TESTING") == "true" {
+		t.Run("Integreatly Upgrade Tests", func(t *testing.T) {
+			for _, test := range common.UPGRADE_TESTS {
+				t.Run(test.Description, func(t *testing.T) {
+					testingContext, err := common.NewTestingContext(f.KubeConfig)
+					if err != nil {
+						t.Fatal("failed to create testing context", err)
+					}
+					test.Test(t, testingContext)
+				})
+			}
+		})
+	} else {
+		t.Skip("Skipping Upgrade tests as UPGRADE_TESTING env var is not set to true")
+	}
+
 }

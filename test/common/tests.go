@@ -49,4 +49,8 @@ var (
 		// Add all destructive tests here that should not be executed as part of the happy path tests
 		{"J03 - Verify namespaces restored when deleted", TestNamespaceRestoration},
 	}
+
+	UPGRADE_TESTS = []TestCase{
+		{"Verify Upgrade versions", TestUpgradeVersions},
+	}
 )
