@@ -76,6 +76,7 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.17.4
 	k8s.io/metrics => k8s.io/metrics v0.17.4
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.17.4
+	github.com/integr8ly/cloud-resource-operator => github.com/briangallagher/cloud-resource-operator v0.22.2-0.20201008112055-8ee8d64dbd27
 )
 
 replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.5.2
