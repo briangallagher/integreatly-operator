@@ -30,18 +30,12 @@ const (
 
 	defaultReconcileTime = time.Second * 30
 
-	ResourceIdentifierAnnotation = "resourceIdentifier"
+	resourceIdentifierAnnotation = "resourceIdentifier"
 )
 
 //DefaultConfigMapNamespace is the default namespace that Configmaps will be created in
 var DefaultConfigMapNamespace, _ = k8sutil.GetWatchNamespace()
 
-/*
-StrategyConfig provides the configuration necessary to create/modify/delete aws resources
-Region -> required to create aws sessions, if no region is provided we default to cluster infrastructure
-CreateStrategy -> maps to resource specific create parameters, uses as a source of truth to the state we expect the resource to be in
-DeleteStrategy -> maps to resource specific delete parameters
-*/
 type StrategyConfig struct {
 	Region         string          `json:"region"`
 	CreateStrategy json.RawMessage `json:"createStrategy"`
@@ -113,10 +107,9 @@ func BuildDefaultConfigMap(name, namespace string) *v1.ConfigMap {
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			"blobstorage": "{\"development\": { \"region\": \"\", \"_network\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"_network\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }}",
-			"redis":       "{\"development\": { \"region\": \"\", \"_network\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"_network\": \"\",\"createStrategy\": {}, \"deleteStrategy\": {} }}",
-			"postgres":    "{\"development\": { \"region\": \"\", \"_network\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"_network\": \"\",\"createStrategy\": {}, \"deleteStrategy\": {} }}",
-			"_network":    "{\"development\": { \"region\": \"\", \"_network\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"_network\": \"\",\"createStrategy\": {}, \"deleteStrategy\": {} }}",
+			"blobstorage": "{\"development\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }}",
+			"redis":       "{\"development\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }}",
+			"postgres":    "{\"development\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }, \"production\": { \"region\": \"\", \"createStrategy\": {}, \"deleteStrategy\": {} }}",
 		},
 	}
 }
