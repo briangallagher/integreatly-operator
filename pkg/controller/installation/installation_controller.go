@@ -19,7 +19,7 @@ import (
 
 	usersv1 "github.com/openshift/api/user/v1"
 
-	"github.com/sirupsen/logrus"
+	logrus "github.com/sirupsen/logrus"
 
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
 	"github.com/integr8ly/integreatly-operator/pkg/config"
@@ -63,6 +63,9 @@ const (
 var (
 	DefaultInstallationPrefix   = global.NamespacePrefix
 	productVersionMismatchFound bool
+	log                         = logrus.WithFields(logrus.Fields{
+		"controller": "installation",
+	})
 )
 
 // Add creates a new Installation Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -155,7 +158,8 @@ func createInstallationCR(ctx context.Context, serverClient k8sclient.Client) er
 		return err
 	}
 
-	logrus.Infof("Looking for rhmi CR in %s namespace", namespace)
+	//logrus.Infof("Looking for rhmi CR in %s namespace", namespace)
+	//log.WithFields(log.Fields{"namespace": namespace}).Info("Looking for rhmi CR")
 
 	installationList := &integreatlyv1alpha1.RHMIList{}
 	listOpts := []k8sclient.ListOption{
