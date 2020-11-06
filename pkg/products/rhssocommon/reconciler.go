@@ -3,6 +3,7 @@ package rhssocommon
 import (
 	"context"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"strings"
 
 	monitoringv1alpha1 "github.com/integr8ly/application-monitoring-operator/pkg/apis/applicationmonitoring/v1alpha1"
@@ -42,23 +43,23 @@ type Reconciler struct {
 	ConfigManager config.ConfigReadWriter
 	mpm           marketplace.MarketplaceInterface
 	Installation  *integreatlyv1alpha1.RHMI
-	Logger        *logrus.Entry
 	Oauthv1Client oauthClient.OauthV1Interface
 	APIURL        string
 	*resources.Reconciler
+	logger                *logrus.Entry
 	Recorder              record.EventRecorder
 	KeycloakClientFactory keycloakCommon.KeycloakClientFactory
 }
 
-func NewReconciler(configManager config.ConfigReadWriter, mpm marketplace.MarketplaceInterface, installation *integreatlyv1alpha1.RHMI, logger *logrus.Entry, oauthv1Client oauthClient.OauthV1Interface, recorder record.EventRecorder, APIURL string, keycloakClientFactory keycloakCommon.KeycloakClientFactory) *Reconciler {
+func NewReconciler(configManager config.ConfigReadWriter, mpm marketplace.MarketplaceInterface, installation *integreatlyv1alpha1.RHMI, log *logrus.Entry, oauthv1Client oauthClient.OauthV1Interface, recorder record.EventRecorder, APIURL string, keycloakClientFactory keycloakCommon.KeycloakClientFactory) *Reconciler {
 	return &Reconciler{
 		ConfigManager:         configManager,
 		mpm:                   mpm,
 		Installation:          installation,
-		Logger:                logger,
 		Oauthv1Client:         oauthv1Client,
 		APIURL:                APIURL,
 		Reconciler:            resources.NewReconciler(mpm),
+		logger:                log,
 		Recorder:              recorder,
 		KeycloakClientFactory: keycloakClientFactory,
 	}
@@ -207,7 +208,7 @@ func (r *Reconciler) CreateKeycloakRoute(ctx context.Context, serverClient k8scl
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("error creating keycloak edge route: %w", err)
 	}
-	r.Logger.Info(fmt.Sprintf("operation result of creating %v service was %v", edgeRoute.Name, or))
+	r.logger.Infof("Operation result creating service", logger.Fields{"RouteName": edgeRoute.Name, "result": or})
 
 	if edgeRoute.Spec.Host == "" {
 		return integreatlyv1alpha1.PhaseInProgress, nil
@@ -297,7 +298,7 @@ func ContainsIdentityProvider(providers []*keycloak.KeycloakIdentityProvider, al
 }
 
 func (r *Reconciler) ReconcileCloudResources(dbPRefix string, defaultNamespace string, ssoType string, config *config.RHSSOCommon, ctx context.Context, installation *integreatlyv1alpha1.RHMI, serverClient k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-	r.Logger.Info("Reconciling Keycloak external database instance")
+	r.logger.Info("Reconciling Keycloak external database instance")
 	postgresName := fmt.Sprintf("%s%s", dbPRefix, installation.Name)
 	postgres, err := resources.ReconcileRHSSOPostgresCredentials(ctx, installation, serverClient, postgresName, config.GetNamespace(), defaultNamespace)
 
@@ -431,7 +432,7 @@ func (r *Reconciler) HandleProgressPhase(ctx context.Context, serverClient k8scl
 		return integreatlyv1alpha1.PhaseFailed, err
 	}
 
-	r.Logger.Info("checking ready status for rhsso")
+	r.logger.Info("checking ready status for rhsso")
 	kcr := &keycloak.KeycloakRealm{}
 
 	err = serverClient.Get(ctx, k8sclient.ObjectKey{Name: keycloakRealmName, Namespace: config.GetNamespace()}, kcr)
@@ -449,7 +450,8 @@ func (r *Reconciler) HandleProgressPhase(ctx context.Context, serverClient k8scl
 		return integreatlyv1alpha1.PhaseCompleted, nil
 	}
 
-	r.Logger.Infof("KeycloakRealm status phase is: %s", kcr.Status.Phase)
+	r.logger.Infof("KeycloakRealm status phase", logger.Fields{"RouteName": kcr.Status.Phase})
+
 	return integreatlyv1alpha1.PhaseInProgress, nil
 }
 

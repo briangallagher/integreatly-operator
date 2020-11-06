@@ -3,6 +3,7 @@ package rhssouser
 import (
 	"context"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"strings"
 
 	"github.com/integr8ly/integreatly-operator/pkg/products/rhssocommon"
@@ -22,7 +23,6 @@ import (
 	keycloak "github.com/keycloak/keycloak-operator/pkg/apis/keycloak/v1alpha1"
 
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
-	"github.com/sirupsen/logrus"
 
 	"github.com/integr8ly/integreatly-operator/pkg/config"
 	"github.com/integr8ly/integreatly-operator/pkg/resources"
@@ -66,25 +66,28 @@ const (
 	userSSOIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2Q3MWUwMDt9LmNscy0ye2ZpbGw6I2MyMWEwMDt9LmNscy0ze2ZpbGw6I2NkY2RjZDt9LmNscy00e2ZpbGw6I2ZmZjt9LmNscy01e2ZpbGw6I2VhZWFlYTt9PC9zdHlsZT48L2RlZnM+PHRpdGxlPnByb2R1Y3RpY29uc18xMDE3X1JHQl9TU08gZmluYWwgY29sb3I8L3RpdGxlPjxnIGlkPSJMYXllcl8xIiBkYXRhLW5hbWU9IkxheWVyIDEiPjxjaXJjbGUgY2xhc3M9ImNscy0xIiBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMC43MSA1MCkgcm90YXRlKC00NSkiLz48cGF0aCBjbGFzcz0iY2xzLTIiIGQ9Ik04NS4zNiwxNC42NEE1MCw1MCwwLDAsMSwxNC42NCw4NS4zNloiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0yMy40OCw3MC41OHYzYTEuNDQsMS40NCwwLDAsMCwwLC4yOEw0Niw1MS40NWwtLjcxLTIuNjNaIi8+PHBhdGggY2xhc3M9ImNscy0zIiBkPSJNODEuMjQsNDIuMDksNzYuNjUsMjQuOTVBMiwyLDAsMCwwLDc2LDI0bC0yLjIxLDIuMjFhMiwyLDAsMCwxLC42MiwxbDMuNzksMTQuMTNhMiwyLDAsMCwxLS41MywyTDY3LjM2LDUzLjU5YTIsMiwwLDAsMS0yLC41M0w1MS4yNyw1MC4zM2EyLDIsMCwwLDEtMS0uNjJsLTIuMjEsMi4yMWEyLDIsMCwwLDAsMSwuNjJsMTcuMTQsNC41OWEyLDIsMCwwLDAsMi0uNTNMODAuNzIsNDQuMDVBMiwyLDAsMCwwLDgxLjI0LDQyLjA5WiIvPjxwYXRoIGNsYXNzPSJjbHMtNCIgZD0iTTQ1LjA5LDQxLjYybC0xLjcxLDEuNzFhMi4xMywyLjEzLDAsMCwwLDAsM2wuNzcuNzctMjAuMywyMC4zYTEuMjUsMS4yNSwwLDAsMC0uMzcuODh2Mi4yOUw0NS4yNCw0OC44Miw0Niw1MS40NSwyMy41MSw3My44OUExLjQ0LDEuNDQsMCwwLDAsMjQuOTIsNzVoMEw0OC4wOCw1MS45MWEyLjQsMi40LDAsMCwxLS40NS0uODJaIi8+PHBhdGggY2xhc3M9ImNscy00IiBkPSJNNzMsMjUuNzEsNTguODgsMjEuOTNhMiwyLDAsMCwwLTIsLjUzTDQ2LjU3LDMyLjhhMiwyLDAsMCwwLS41MywybDMuNzksMTQuMTNhMiwyLDAsMCwwLC40NS44Mkw2Ni41NywzMy40Myw2Mi4xNCwyOWExLjI1LDEuMjUsMCwwLDEsLjI4LTEuMTVsLS4wNiwwLC4xMS0uMTEsMCwuMDZhMS4yNSwxLjI1LDAsMCwxLDEuMTUtLjI4TDcwLDI5LjI5YTEuMjQsMS4yNCwwLDAsMSwuNDcuMjVsMy4zNy0zLjM3QTIsMiwwLDAsMCw3MywyNS43MVoiLz48cGF0aCBjbGFzcz0iY2xzLTUiIGQ9Ik03OC4yMyw0MS4yOCw3NC40NSwyNy4xNWEyLDIsMCwwLDAtLjYyLTFsLTMuMzcsMy4zN2ExLjI1LDEuMjUsMCwwLDEsLjQyLjY0bDEuNzIsNi40MWExLjI1LDEuMjUsMCwwLDEtLjI4LDEuMTVsLjA2LDAtLjExLjExLDAtLjA2YTEuMjUsMS4yNSwwLDAsMS0xLjE1LjI4bC00LjU5LTQuNTlMNTAuMjksNDkuNzFhMiwyLDAsMCwwLDEsLjYyTDY1LjQsNTQuMTFhMiwyLDAsMCwwLDItLjUzTDc3LjcsNDMuMjRBMiwyLDAsMCwwLDc4LjIzLDQxLjI4WiIvPjxwYXRoIGNsYXNzPSJjbHMtNSIgZD0iTTc1LjIxLDIzLjUxLDU4LjA3LDE4LjkyYTIsMiwwLDAsMC0yLC41M0w0My41NiwzMkEyLDIsMCwwLDAsNDMsMzRsNC41OSwxNy4xNGEyLjQsMi40LDAsMCwwLC40NS44MkwyNC45NSw3NWg2LjY0YTEuMjUsMS4yNSwwLDAsMCwuODgtLjM3bDEuODMtMS44M2ExLjI1LDEuMjUsMCwwLDAsLjM3LS44OHYtMy42QS40Ny40NywwLDAsMSwzNC44LDY4bC42Mi0uNjJhLjQ3LjQ3LDAsMCwxLC4zMy0uMTRoMy4xNGExLjI1LDEuMjUsMCwwLDAsLjg4LS4zN2wuNTYtLjU2YTEuMjUsMS4yNSwwLDAsMCwuMzctLjg4VjYzLjE3YS40Ny40NywwLDAsMSwuMTQtLjMzbC43LS43YS40Ny40NywwLDAsMSwuMzMtLjE0aDQuNjdhMS4yNSwxLjI1LDAsMCwwLC44OC0uMzdMNTMsNTZsLjc3Ljc3YTIuMTMsMi4xMywwLDAsMCwzLDBsMS43MS0xLjcxLTkuNDctMi41NGEyLDIsMCwwLDEtMS0uNjJsMi4yMS0yLjIxYTIsMiwwLDAsMS0uNDUtLjgyTDQ2LDM0Ljc2YTIsMiwwLDAsMSwuNTMtMkw1Ni45MiwyMi40NmEyLDIsMCwwLDEsMi0uNTNMNzMsMjUuNzFhMiwyLDAsMCwxLC44Mi40NUw3NiwyNEEyLjQzLDIuNDMsMCwwLDAsNzUuMjEsMjMuNTFaIi8+PC9nPjwvc3ZnPg=="
 )
 
-var realmManagersClientRoles = []string{
-	"create-client",
-	"manage-authorization",
-	"manage-clients",
-	"manage-events",
-	"manage-identity-providers",
-	"manage-realm",
-	"manage-users",
-	"query-clients",
-	"query-groups",
-	"query-realms",
-	"query-users",
-	"view-authorization",
-	"view-clients",
-	"view-events",
-	"view-identity-providers",
-	"view-realm",
-	"view-users",
-}
+var (
+	log                      = logger.NewLogger()
+	realmManagersClientRoles = []string{
+		"create-client",
+		"manage-authorization",
+		"manage-clients",
+		"manage-events",
+		"manage-identity-providers",
+		"manage-realm",
+		"manage-users",
+		"query-clients",
+		"query-groups",
+		"query-realms",
+		"query-users",
+		"view-authorization",
+		"view-clients",
+		"view-events",
+		"view-identity-providers",
+		"view-realm",
+		"view-users",
+	}
+)
 
 type Reconciler struct {
 	Config *config.RHSSOUser
@@ -92,6 +95,8 @@ type Reconciler struct {
 }
 
 func NewReconciler(configManager config.ConfigReadWriter, installation *integreatlyv1alpha1.RHMI, oauthv1Client oauthClient.OauthV1Interface, mpm marketplace.MarketplaceInterface, recorder record.EventRecorder, apiUrl string, keycloakClientFactory keycloakCommon.KeycloakClientFactory) (*Reconciler, error) {
+	log.Logger = log.WithContext(map[string]interface{}{logger.StageLogContext: integreatlyv1alpha1.ProductsStage, logger.ProductLogContext: integreatlyv1alpha1.ProductRHSSOUser})
+
 	config, err := configManager.ReadRHSSOUser()
 	if err != nil {
 		return nil, err
@@ -99,11 +104,9 @@ func NewReconciler(configManager config.ConfigReadWriter, installation *integrea
 
 	rhssocommon.SetNameSpaces(installation, config.RHSSOCommon, defaultNamespace)
 
-	logger := logrus.NewEntry(logrus.StandardLogger())
-
 	return &Reconciler{
 		Config:     config,
-		Reconciler: rhssocommon.NewReconciler(configManager, mpm, installation, logger, oauthv1Client, recorder, apiUrl, keycloakClientFactory),
+		Reconciler: rhssocommon.NewReconciler(configManager, mpm, installation, log.Logger, oauthv1Client, recorder, apiUrl, keycloakClientFactory),
 	}, nil
 }
 
@@ -249,12 +252,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 	product.OperatorVersion = r.Config.GetOperatorVersion()
 
 	events.HandleProductComplete(r.Recorder, installation, integreatlyv1alpha1.ProductsStage, r.Config.GetProductName())
-	r.Logger.Infof("%s has reconciled successfully", r.Config.GetProductName())
+	log.Infof("Product Reconciled Successfully", logger.Fields{"product": "r.Config.GetProductName()"})
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
 func (r *Reconciler) reconcileComponents(ctx context.Context, installation *integreatlyv1alpha1.RHMI, serverClient k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-	r.Logger.Info("Reconciling Keycloak components")
+	log.Info("Reconciling Keycloak components")
 	kc := &keycloak.Keycloak{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      keycloakName,
@@ -279,11 +282,11 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update keycloak custom resource: %w", err)
 	}
-	r.Logger.Infof("The operation result for keycloak %s was %s", kc.Name, or)
+	log.Infof("Keycloak Operator Result", logger.Fields{"keycloakName": kc.Name, "result": or})
 
 	// We want to update the master realm by adding an openshift-v4 idp. We can not add the idp until we know the host
 	if r.Config.GetHost() == "" {
-		logrus.Warningf("Can not update keycloak master realm on user sso as host is not available yet")
+		log.Warning("Can not update keycloak master realm on user sso as host is not available yet")
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update keycloak master realm, host not available")
 	}
 
@@ -303,7 +306,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	// We have to create via rhsso client as keycloak will not accept changes to the master realm, via cr changes,
 	// after its initial creation
 	if masterKcr.Spec.Realm.IdentityProviders == nil && masterKcr.Spec.Realm.IdentityProviders[0] == nil {
-		logrus.Warningf("Identity Provider not present on Realm - user sso")
+		log.Warning("Identity Provider not present on Realm - user sso")
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to update keycloak master realm with required IDP: %w", err)
 	}
 
@@ -372,7 +375,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
 		} else {
-			r.Logger.Infof("The operation result for keycloakuser %s was %s", user.UserName, or)
+			log.Infof("KeycloakUser Operator Result", logger.Fields{"username": user.UserName, "result": or})
 		}
 	}
 
@@ -457,7 +460,7 @@ func (r *Reconciler) updateMasterRealm(ctx context.Context, serverClient k8sclie
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/update keycloak realm: %w", err)
 	}
-	r.Logger.Infof("The operation result for keycloakrealm %s was %s", kcr.Name, or)
+	log.Infof("KeycloakRealm Operator Result", logger.Fields{"username": kcr.Name, "result": or})
 
 	return kcr, nil
 }
@@ -778,7 +781,7 @@ func (r *Reconciler) reconcileBrowserAuthFlow(ctx context.Context, kc *keycloak.
 	for _, execution := range executions {
 		if execution.ProviderID == "identity-provider-redirector" {
 			if execution.AuthenticationConfig != "" {
-				r.Logger.Infof("Authenticator Config exists on master realm, rhsso-user")
+				log.Info("Authenticator Config exists on master realm, rhsso-user")
 				return integreatlyv1alpha1.PhaseCompleted, nil
 			}
 			executionID = execution.ID
@@ -795,7 +798,7 @@ func (r *Reconciler) reconcileBrowserAuthFlow(ctx context.Context, kc *keycloak.
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to create Authenticator Config: %w", err)
 	}
 
-	r.Logger.Infof("Successfully created Authenticator Config")
+	log.Info("Successfully created Authenticator Config")
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
@@ -1017,7 +1020,7 @@ func (r *Reconciler) reconcileFirstLoginAuthFlow(kc *keycloak.Keycloak) (integre
 		return integreatlyv1alpha1.PhaseCompleted, nil
 	}
 
-	logrus.Info("Disabling \"review profile\" execution from first broker login authentication flow")
+	log.Info("Disabling \"review profile\" execution from first broker login authentication flow")
 
 	// Update the execution to "DISABLED"
 	authenticationExecution.Requirement = "DISABLED"

@@ -3,6 +3,8 @@ package installation
 import (
 	"context"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/controller/installation/bootstrap"
+	"github.com/sirupsen/logrus"
 	"os"
 	"reflect"
 	"strings"
@@ -19,13 +21,12 @@ import (
 
 	usersv1 "github.com/openshift/api/user/v1"
 
-	logrus "github.com/sirupsen/logrus"
-
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
 	"github.com/integr8ly/integreatly-operator/pkg/config"
 	"github.com/integr8ly/integreatly-operator/pkg/metrics"
 	"github.com/integr8ly/integreatly-operator/pkg/products"
 	"github.com/integr8ly/integreatly-operator/pkg/resources"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"github.com/integr8ly/integreatly-operator/pkg/resources/marketplace"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
@@ -48,7 +49,7 @@ import (
 )
 
 const (
-	deletionFinalizer                = "finalizer/configmaps"
+	DeletionFinalizer                = "finalizer/configmaps"
 	DefaultInstallationName          = "rhmi"
 	ManagedApiInstallationName       = "managed-api"
 	DefaultInstallationConfigMapName = "installation-config"
@@ -63,9 +64,7 @@ const (
 var (
 	DefaultInstallationPrefix   = global.NamespacePrefix
 	productVersionMismatchFound bool
-	log                         = logrus.WithFields(logrus.Fields{
-		"controller": "installation",
-	})
+	log                         = logger.NewLogger()
 )
 
 // Add creates a new Installation Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -89,6 +88,8 @@ func newReconciler(mgr manager.Manager) ReconcileInstallation {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r ReconcileInstallation) error {
+	log.Logger = log.WithContext(map[string]interface{}{logger.ControllerLogContext: "installation_controller"})
+
 	// Create a new controller
 	c, err := controller.New("installation-controller", mgr, controller.Options{Reconciler: reconcile.Reconciler(&r)})
 	if err != nil {
@@ -158,8 +159,9 @@ func createInstallationCR(ctx context.Context, serverClient k8sclient.Client) er
 		return err
 	}
 
+	//bgbg
 	//logrus.Infof("Looking for rhmi CR in %s namespace", namespace)
-	//log.WithFields(log.Fields{"namespace": namespace}).Info("Looking for rhmi CR")
+	log.Infof("Looking for rhmi CR", logger.Fields{"namespace": namespace})
 
 	installationList := &integreatlyv1alpha1.RHMIList{}
 	listOpts := []k8sclient.ListOption{
@@ -181,7 +183,9 @@ func createInstallationCR(ctx context.Context, serverClient k8sclient.Client) er
 		installType, _ := os.LookupEnv(installTypeEnvName)
 		priorityClassName, _ := os.LookupEnv(priorityClassNameEnvName)
 
-		logrus.Infof("Creating a %s rhmi CR with USC %s, as no CR rhmis were found in %s namespace", installType, useClusterStorage, namespace)
+		//logrus.Infof("Creating a %s rhmi CR with USC %s, as no CR rhmis were found in %s namespace", installType, useClusterStorage, namespace)
+
+		log.Infof("Creating rhmi CR", logger.Fields{"namespace": namespace, "installType": installType, "useClusterStorage": useClusterStorage})
 
 		if installType == "" {
 			installType = string(integreatlyv1alpha1.InstallationTypeManaged)
@@ -313,8 +317,8 @@ func (r *ReconcileInstallation) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 
-	if !resources.Contains(installation.GetFinalizers(), deletionFinalizer) && installation.GetDeletionTimestamp() == nil {
-		installation.SetFinalizers(append(installation.GetFinalizers(), deletionFinalizer))
+	if !resources.Contains(installation.GetFinalizers(), DeletionFinalizer) && installation.GetDeletionTimestamp() == nil {
+		installation.SetFinalizers(append(installation.GetFinalizers(), DeletionFinalizer))
 	}
 
 	if installation.Status.Stages == nil {
@@ -534,7 +538,7 @@ func (r *ReconcileInstallation) handleUninstall(installation *integreatlyv1alpha
 	}
 
 	//all products gone and no errors, tidy up bootstrap stuff
-	if len(installation.Finalizers) == 1 && installation.Finalizers[0] == deletionFinalizer {
+	if len(installation.Finalizers) == 1 && installation.Finalizers[0] == DeletionFinalizer {
 		logrus.Infof("len finalizers: %v", len(installation.Finalizers))
 		// delete ConfigMap after all product finalizers finished
 		if err := r.client.Delete(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: installationCfgMap, Namespace: installation.Namespace}}); err != nil && !k8serr.IsNotFound(err) {
@@ -557,7 +561,7 @@ func (r *ReconcileInstallation) handleUninstall(installation *integreatlyv1alpha
 			return retryRequeue, merr
 		}
 
-		installation.SetFinalizers(resources.Remove(installation.GetFinalizers(), deletionFinalizer))
+		installation.SetFinalizers(resources.Remove(installation.GetFinalizers(), DeletionFinalizer))
 
 		err = r.client.Update(context.TODO(), installation)
 		if err != nil {
@@ -705,7 +709,7 @@ func (r *ReconcileInstallation) bootstrapStage(installation *integreatlyv1alpha1
 	installation.Status.Stage = integreatlyv1alpha1.BootstrapStage
 	mpm := marketplace.NewManager()
 
-	reconciler, err := NewBootstrapReconciler(configManager, installation, mpm, r.mgr.GetEventRecorderFor(string(integreatlyv1alpha1.BootstrapStage)))
+	reconciler, err := bootstrap.NewBootstrapReconciler(configManager, installation, mpm, r.mgr.GetEventRecorderFor(string(integreatlyv1alpha1.BootstrapStage)))
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to build a reconciler for Bootstrap: %w", err)
 	}
@@ -801,8 +805,8 @@ func (r *ReconcileInstallation) handleCROConfigDeletion(rhmi integreatlyv1alpha1
 	}
 
 	// remove cloud resource config deletion finalizer if it exists
-	if resources.Contains(croConf.Finalizers, deletionFinalizer) {
-		croConf.SetFinalizers(resources.Remove(croConf.Finalizers, deletionFinalizer))
+	if resources.Contains(croConf.Finalizers, DeletionFinalizer) {
+		croConf.SetFinalizers(resources.Remove(croConf.Finalizers, DeletionFinalizer))
 
 		if err := r.client.Update(context.TODO(), croConf); err != nil {
 			return fmt.Errorf("error occurred trying to update cro config map %w", err)

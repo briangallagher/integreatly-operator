@@ -1,16 +1,16 @@
-package installation
+package bootstrap
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/controller/installation"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/operator-framework/operator-lifecycle-manager/pkg/lib/ownerutil"
-
-	"github.com/sirupsen/logrus"
 
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
 	"github.com/integr8ly/integreatly-operator/pkg/config"
@@ -36,7 +36,12 @@ import (
 	marin3rconfig "github.com/integr8ly/integreatly-operator/pkg/products/marin3r/config"
 )
 
+var (
+	log = logger.NewLogger()
+)
+
 func NewBootstrapReconciler(configManager config.ConfigReadWriter, installation *integreatlyv1alpha1.RHMI, mpm marketplace.MarketplaceInterface, recorder record.EventRecorder) (*Reconciler, error) {
+	log.Logger = log.WithContext(map[string]interface{}{logger.StageLogContext: integreatlyv1alpha1.BootstrapStage})
 	return &Reconciler{
 		ConfigManager: configManager,
 		mpm:           mpm,
@@ -60,7 +65,7 @@ func (r *Reconciler) GetPreflightObject(ns string) runtime.Object {
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1alpha1.RHMI, serverClient k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-	logrus.Infof("Reconciling bootstrap stage")
+	log.Infof("Reconciling bootstrap stage", logger.Fields{"var1": "var1", "var2": "var2"})
 
 	phase, err := r.reconcileOauthSecrets(ctx, serverClient)
 	if err != nil || phase != integreatlyv1alpha1.PhaseCompleted {
@@ -119,9 +124,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 	events.HandleStageComplete(r.recorder, installation, integreatlyv1alpha1.BootstrapStage)
 
 	metrics.SetRHMIInfo(installation)
-	logrus.Info("Metric rhmi_info exposed")
+	log.Info("Metric rhmi_info exposed")
 
-	logrus.Info("Bootstrap stage reconciled successfully")
+	log.Info("Bootstrap stage reconciled successfully")
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
@@ -150,9 +155,9 @@ func (r *Reconciler) reconcilePriorityClass(ctx context.Context, serverClient k8
 func (r *Reconciler) checkCloudResourcesConfig(ctx context.Context, serverClient k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
 	cloudConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       DefaultCloudResourceConfigName,
+			Name:       installation.DefaultCloudResourceConfigName,
 			Namespace:  r.installation.Namespace,
-			Finalizers: []string{deletionFinalizer},
+			Finalizers: []string{installation.DeletionFinalizer},
 		},
 	}
 
@@ -333,7 +338,7 @@ func (r *Reconciler) reconcileOauthSecrets(ctx context.Context, serverClient k8s
 			} else {
 				// recover secret from existing OAuthClient object in case Secret object was deleted
 				oauthClientSecrets.Data[string(product)] = []byte(oauthClient.Secret)
-				logrus.Warningf("OAuth client secret for %s recovered from OAutchClient object", string(product))
+				log.Warningf("OAuth client secret for %s recovered from OAutchClient object", logger.Fields{"product": string(product)})
 			}
 		}
 	}
@@ -343,7 +348,7 @@ func (r *Reconciler) reconcileOauthSecrets(ctx context.Context, serverClient k8s
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling OAuth clients secrets: %w", err)
 	}
-	logrus.Info("Bootstrap OAuth client secrets successfully reconciled")
+	log.Info("Bootstrap OAuth client secrets successfully reconciled")
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
@@ -408,7 +413,7 @@ func (r *Reconciler) reconcilerGithubOauthSecret(ctx context.Context, serverClie
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling Github OAuth secrets: %w", err)
 	}
 
-	logrus.Info("Bootstrap Github OAuth secrets successfully reconciled")
+	log.Info("Bootstrap Github OAuth secrets successfully reconciled")
 
 	secretRoleCR := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -453,7 +458,7 @@ func (r *Reconciler) reconcilerGithubOauthSecret(ctx context.Context, serverClie
 	}); err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error creating Github OAuth secrets role binding: %w", err)
 	}
-	logrus.Info("Bootstrap Github OAuth secrets Role and Role Binding successfully reconciled")
+	log.Info("Bootstrap Github OAuth secrets Role and Role Binding successfully reconciled")
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 
@@ -479,7 +484,7 @@ func (r *Reconciler) reconcileRHMIConfigPermissions(ctx context.Context, serverC
 		return integreatlyv1alpha1.PhaseFailed, err
 	}
 
-	logrus.Info("Found and deleted rhmiconfig-dedicated-admins-role-binding")
+	log.Info("Found and deleted rhmiconfig-dedicated-admins-role-binding")
 
 	// Delete the role binding
 	if err := serverClient.Delete(ctx, configRoleBinding); err != nil {

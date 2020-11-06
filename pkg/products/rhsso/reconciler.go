@@ -3,6 +3,8 @@ package rhsso
 import (
 	"context"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
+	"github.com/sirupsen/logrus"
 
 	"github.com/integr8ly/integreatly-operator/pkg/products/rhssocommon"
 	"github.com/integr8ly/integreatly-operator/version"
@@ -13,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	keycloakCommon "github.com/integr8ly/keycloak-client/pkg/common"
-	"github.com/sirupsen/logrus"
 
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/pkg/apis/integreatly/v1alpha1"
 	"github.com/integr8ly/integreatly-operator/pkg/config"
@@ -44,6 +45,7 @@ var (
 	numberOfReplicas          = 2
 	ssoType                   = "rhsso"
 	postgresResourceName      = "rhsso-postgres-rhmi"
+	log                       = logger.NewLogger()
 )
 
 const (
@@ -58,6 +60,8 @@ type Reconciler struct {
 }
 
 func NewReconciler(configManager config.ConfigReadWriter, installation *integreatlyv1alpha1.RHMI, oauthv1Client oauthClient.OauthV1Interface, mpm marketplace.MarketplaceInterface, recorder record.EventRecorder, APIURL string, keycloakClientFactory keycloakCommon.KeycloakClientFactory) (*Reconciler, error) {
+	log.Logger = log.WithContext(map[string]interface{}{logger.StageLogContext: integreatlyv1alpha1.ProductsStage, logger.ProductLogContext: integreatlyv1alpha1.ProductRHSSO})
+
 	config, err := configManager.ReadRHSSO()
 
 	if err != nil {
@@ -66,11 +70,9 @@ func NewReconciler(configManager config.ConfigReadWriter, installation *integrea
 
 	rhssocommon.SetNameSpaces(installation, config.RHSSOCommon, defaultOperandNamespace)
 
-	logger := logrus.NewEntry(logrus.StandardLogger())
-
 	return &Reconciler{
 		Config:     config,
-		Reconciler: rhssocommon.NewReconciler(configManager, mpm, installation, logger, oauthv1Client, recorder, APIURL, keycloakClientFactory),
+		Reconciler: rhssocommon.NewReconciler(configManager, mpm, installation, log.Logger, oauthv1Client, recorder, APIURL, keycloakClientFactory),
 	}, nil
 }
 
@@ -216,7 +218,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 }
 
 func (r *Reconciler) reconcileComponents(ctx context.Context, installation *integreatlyv1alpha1.RHMI, serverClient k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-	r.Logger.Info("Reconciling Keycloak components")
+	log.Info("Reconciling Keycloak components")
 	kc := &keycloak.Keycloak{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      keycloakName,
@@ -245,11 +247,12 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	}
 	host := r.Config.GetHost()
 	if host == "" {
-		r.Logger.Infof("URL for Keycloak not yet available")
+		log.Info("URL for Keycloak not yet available")
 		return integreatlyv1alpha1.PhaseAwaitingComponents, fmt.Errorf("Host for Keycloak not yet available")
 	}
 
-	r.Logger.Infof("The operation result for keycloak %s was %s", kc.Name, or)
+	log.Infof("Keycloak operation result", logger.Fields{"Keycloak Name": kc.Name, "result": or})
+
 	kcr := &keycloak.KeycloakRealm{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      keycloakRealmName,
@@ -301,7 +304,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update keycloak realm: %w", err)
 	}
-	r.Logger.Infof("The operation result for keycloakrealm %s was %s", kcr.Name, or)
+	log.Infof("KeycloakRealm operation result", logger.Fields{"KeycloakRealm Name": kcr.Name, "result": or})
 
 	// create keycloak authentication delay flow and adds to openshift idp
 	authenticated, err := r.KeycloakClientFactory.AuthenticatedClient(*kc)
@@ -313,7 +316,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create and add keycloak authentication flow: %w", err)
 	}
-	r.Logger.Infof("Authentication flow added to %s IDP", idpAlias)
+	log.Infof("Authentication flow added to %s IDP", logger.Fields{"idpAlias": idpAlias})
 
 	// Get all currently existing keycloak users
 	keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
@@ -333,8 +336,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
 		}
-		r.Logger.Infof("The operation result for keycloakuser %s was %s", user.UserName, or)
-
+		log.Infof("KeycloakUser operation result", logger.Fields{"KeycloakUser Name": user.UserName, "result": or})
 	}
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,8 +15,6 @@ import (
 
 	"github.com/integr8ly/integreatly-operator/pkg/resources/constants"
 	"github.com/integr8ly/integreatly-operator/version"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/service/elasticache"
 	"github.com/aws/aws-sdk-go/service/rds"
@@ -42,17 +41,22 @@ const (
 	manifestPackage              = "integreatly-cloud-resources"
 )
 
+var (
+	log = logger.NewLogger()
+)
+
 type Reconciler struct {
 	Config        *config.CloudResources
 	ConfigManager config.ConfigReadWriter
 	installation  *integreatlyv1alpha1.RHMI
 	mpm           marketplace.MarketplaceInterface
-	logger        *logrus.Entry
 	*resources.Reconciler
 	recorder record.EventRecorder
 }
 
 func NewReconciler(configManager config.ConfigReadWriter, installation *integreatlyv1alpha1.RHMI, mpm marketplace.MarketplaceInterface, recorder record.EventRecorder) (*Reconciler, error) {
+	log.Logger = log.WithContext(map[string]interface{}{logger.StageLogContext: integreatlyv1alpha1.CloudResourcesStage})
+
 	config, err := configManager.ReadCloudResources()
 	if err != nil {
 		return nil, fmt.Errorf("could not read cloud resources config: %w", err)
@@ -67,14 +71,12 @@ func NewReconciler(configManager config.ConfigReadWriter, installation *integrea
 			config.SetOperatorNamespace(config.GetNamespace() + "-operator")
 		}
 	}
-	logger := logrus.WithFields(logrus.Fields{"product": config.GetProductName()})
 
 	return &Reconciler{
 		ConfigManager: configManager,
 		Config:        config,
 		installation:  installation,
 		mpm:           mpm,
-		logger:        logger,
 		Reconciler:    resources.NewReconciler(mpm),
 		recorder:      recorder,
 	}, nil
@@ -162,7 +164,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 	}
 
 	events.HandleProductComplete(r.recorder, installation, integreatlyv1alpha1.CloudResourcesStage, r.Config.GetProductName())
-	r.logger.Infof("%s has reconciled successfully", r.Config.GetProductName())
+	log.Infof("Product Reconciled Successfully", logger.Fields{"product": "r.Config.GetProductName()"})
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
@@ -209,7 +211,7 @@ func (r *Reconciler) createDeletionStrategy(ctx context.Context, installation *i
 }
 
 func (r *Reconciler) cleanupResources(ctx context.Context, installation *integreatlyv1alpha1.RHMI, client k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-	r.logger.Info("ensuring cloud resources are cleaned up")
+	log.Info("Ensuring cloud resources are cleaned up")
 
 	// ensure postgres instances are cleaned up
 	postgresInstances := &crov1alpha1.PostgresList{}
@@ -257,17 +259,17 @@ func (r *Reconciler) cleanupResources(ctx context.Context, installation *integre
 	}
 
 	if len(postgresInstances.Items) > 0 {
-		r.logger.Info("deletion of postgres instances in progress")
+		log.Info("deletion of postgres instances in progress")
 		return integreatlyv1alpha1.PhaseInProgress, nil
 	}
 
 	if len(redisInstances.Items) > 0 {
-		r.logger.Info("deletion of redis instances in progress")
+		log.Info("deletion of redis instances in progress")
 		return integreatlyv1alpha1.PhaseInProgress, nil
 	}
 
 	if len(blobStorages.Items) > 0 {
-		r.logger.Info("deletion of blob storage instances in progress")
+		log.Info("deletion of blob storage instances in progress")
 		return integreatlyv1alpha1.PhaseInProgress, nil
 	}
 
