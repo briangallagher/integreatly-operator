@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"github.com/integr8ly/integreatly-operator/pkg/products/marin3r"
 	"time"
+
+	"github.com/integr8ly/integreatly-operator/pkg/products/containersecurity"
+	"github.com/integr8ly/integreatly-operator/pkg/products/marin3r"
 
 	"github.com/integr8ly/integreatly-operator/pkg/products/monitoringspec"
 
@@ -195,6 +197,8 @@ func NewReconciler(product integreatlyv1alpha1.ProductName, rc *rest.Config, con
 		reconciler, err = marin3r.NewReconciler(configManager, installation, mpm, recorder, log)
 	case integreatlyv1alpha1.ProductGrafana:
 		reconciler, err = grafana.NewReconciler(configManager, installation, mpm, recorder, log)
+	case integreatlyv1alpha1.ProductContainerSecurity:
+		reconciler, err = containersecurity.NewReconciler(configManager, installation, mpm, recorder, log)
 	default:
 		err = errors.New("unknown products: " + string(product))
 		reconciler = &NoOp{}

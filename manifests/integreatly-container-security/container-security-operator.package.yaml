@@ -1,0 +1,4 @@
+packageName: rhmi-container-security
+channels:
+- currentCSV: container-security-operator.v1.0.6
+  name: rhmi

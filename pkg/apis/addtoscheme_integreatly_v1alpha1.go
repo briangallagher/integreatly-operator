@@ -7,6 +7,7 @@ import (
 	envoyconfigv1 "github.com/3scale/marin3r/pkg/apis/marin3r/v1alpha1"
 	discoveryservicev1 "github.com/3scale/marin3r/pkg/apis/operator/v1alpha1"
 	prometheusmonitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	cs "github.com/quay/container-security-operator/apis/secscan/v1alpha1"
 
 	chev1 "github.com/eclipse/che-operator/pkg/apis/org/v1"
 
@@ -89,5 +90,6 @@ func init() {
 		consolev1.AddToScheme,
 		envoyconfigv1.SchemeBuilder.AddToScheme,
 		discoveryservicev1.SchemeBuilder.AddToScheme,
+		cs.SchemeBuilder.AddToScheme,
 	)
 }

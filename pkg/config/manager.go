@@ -60,6 +60,7 @@ type ConfigReadWriter interface {
 	ReadDataSync() (*DataSync, error)
 	ReadMonitoringSpec() (*MonitoringSpec, error)
 	ReadGrafana() (*Grafana, error)
+	ReadContainerSecurity() (*ContainerSecurity, error)
 }
 
 //go:generate moq -out ConfigReadable_moq.go . ConfigReadable
@@ -134,6 +135,8 @@ func (m *Manager) ReadProduct(product integreatlyv1alpha1.ProductName) (ConfigRe
 		return m.ReadMarin3r()
 	case integreatlyv1alpha1.ProductGrafana:
 		return m.ReadGrafana()
+	case integreatlyv1alpha1.ProductContainerSecurity:
+		return m.ReadContainerSecurity()
 	}
 
 	return nil, fmt.Errorf("no config found for product %v", product)
@@ -267,6 +270,15 @@ func (m *Manager) ReadGrafana() (*Grafana, error) {
 	}
 
 	return NewGrafana(config), nil
+}
+
+func (m *Manager) ReadContainerSecurity() (*ContainerSecurity, error) {
+	config, err := m.readConfigForProduct(integreatlyv1alpha1.ProductContainerSecurity)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewContainerSecurity(config), nil
 }
 
 func (m *Manager) ReadUps() (*Ups, error) {

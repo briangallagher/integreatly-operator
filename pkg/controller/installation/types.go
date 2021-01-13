@@ -43,10 +43,11 @@ var (
 			{
 				Name: integreatlyv1alpha1.ProductsStage,
 				Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
-					integreatlyv1alpha1.Product3Scale:    {Name: integreatlyv1alpha1.Product3Scale},
-					integreatlyv1alpha1.ProductRHSSOUser: {Name: integreatlyv1alpha1.ProductRHSSOUser},
-					integreatlyv1alpha1.ProductMarin3r:   {Name: integreatlyv1alpha1.ProductMarin3r},
-					integreatlyv1alpha1.ProductGrafana:   {Name: integreatlyv1alpha1.ProductGrafana},
+					integreatlyv1alpha1.Product3Scale:            {Name: integreatlyv1alpha1.Product3Scale},
+					integreatlyv1alpha1.ProductRHSSOUser:         {Name: integreatlyv1alpha1.ProductRHSSOUser},
+					integreatlyv1alpha1.ProductMarin3r:           {Name: integreatlyv1alpha1.ProductMarin3r},
+					integreatlyv1alpha1.ProductGrafana:           {Name: integreatlyv1alpha1.ProductGrafana},
+					integreatlyv1alpha1.ProductContainerSecurity: {Name: integreatlyv1alpha1.ProductContainerSecurity},
 				},
 			},
 		},
@@ -54,11 +55,12 @@ var (
 			{
 				Name: integreatlyv1alpha1.UninstallProductsStage,
 				Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
-					integreatlyv1alpha1.ProductRHSSO:     {Name: integreatlyv1alpha1.ProductRHSSO},
-					integreatlyv1alpha1.Product3Scale:    {Name: integreatlyv1alpha1.Product3Scale},
-					integreatlyv1alpha1.ProductRHSSOUser: {Name: integreatlyv1alpha1.ProductRHSSOUser},
-					integreatlyv1alpha1.ProductMarin3r:   {Name: integreatlyv1alpha1.ProductMarin3r},
-					integreatlyv1alpha1.ProductGrafana:   {Name: integreatlyv1alpha1.ProductGrafana},
+					integreatlyv1alpha1.ProductRHSSO:             {Name: integreatlyv1alpha1.ProductRHSSO},
+					integreatlyv1alpha1.Product3Scale:            {Name: integreatlyv1alpha1.Product3Scale},
+					integreatlyv1alpha1.ProductRHSSOUser:         {Name: integreatlyv1alpha1.ProductRHSSOUser},
+					integreatlyv1alpha1.ProductMarin3r:           {Name: integreatlyv1alpha1.ProductMarin3r},
+					integreatlyv1alpha1.ProductGrafana:           {Name: integreatlyv1alpha1.ProductGrafana},
+					integreatlyv1alpha1.ProductContainerSecurity: {Name: integreatlyv1alpha1.ProductContainerSecurity},
 				},
 			},
 			{
@@ -116,6 +118,7 @@ var (
 					integreatlyv1alpha1.ProductUps:                 {Name: integreatlyv1alpha1.ProductUps},
 					integreatlyv1alpha1.ProductApicurito:           {Name: integreatlyv1alpha1.ProductApicurito},
 					integreatlyv1alpha1.ProductDataSync:            {Name: integreatlyv1alpha1.ProductDataSync},
+					integreatlyv1alpha1.ProductContainerSecurity:   {Name: integreatlyv1alpha1.ProductContainerSecurity},
 				},
 			},
 			{
@@ -140,6 +143,7 @@ var (
 					integreatlyv1alpha1.ProductApicurito:           {Name: integreatlyv1alpha1.ProductApicurito},
 					integreatlyv1alpha1.ProductDataSync:            {Name: integreatlyv1alpha1.ProductDataSync},
 					integreatlyv1alpha1.ProductSolutionExplorer:    {Name: integreatlyv1alpha1.ProductSolutionExplorer},
+					integreatlyv1alpha1.ProductContainerSecurity:   {Name: integreatlyv1alpha1.ProductContainerSecurity},
 				},
 			},
 			{

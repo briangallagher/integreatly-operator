@@ -58,6 +58,7 @@ var (
 	ProductMonitoringSpec      ProductName = "monitoring-spec"
 	ProductMarin3r             ProductName = "marin3r"
 	ProductGrafana             ProductName = "grafana"
+	ProductContainerSecurity   ProductName = "container-security"
 
 	// Could not find a way to determine these versions dynamically, so they are hard-coded
 	// It is preferable to determine the version of a product dynamically (from a CR, or configmap, etc)
@@ -80,6 +81,7 @@ var (
 	VersionSolutionExplorer    ProductVersion = "2.28.0"
 	VersionMarin3r             ProductVersion = "0.5.1"
 	VersionGrafana             ProductVersion = "3.6.0"
+	VersionConatinerSecurity   ProductVersion = "1.0.6"
 
 	// Versioning for Fuse on OpenShift does not follow a similar pattern to other products.
 	// It is currently implicitly tied to version 7.6 of Fuse, hence the 7.6 value for VersionFuseOnOpenshift above
@@ -110,6 +112,7 @@ var (
 	OperatorVersionMonitoringSpec      OperatorVersion = "1.0"
 	OperatorVersionMarin3r             OperatorVersion = "0.5.1"
 	OperatorVersionGrafana             OperatorVersion = "3.6.0"
+	OperatorVersionContainerSecurity   OperatorVersion = "1.6.0"
 
 	// Event reasons to be used when emitting events
 	EventProcessingError       string = "ProcessingError"

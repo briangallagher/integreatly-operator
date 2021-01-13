@@ -48,6 +48,9 @@ var _ ConfigReadWriter = &ConfigReadWriterMock{}
 //             ReadCodeReadyFunc: func() (*CodeReady, error) {
 // 	               panic("mock out the ReadCodeReady method")
 //             },
+//             ReadContainerSecurityFunc: func() (*ContainerSecurity, error) {
+// 	               panic("mock out the ReadContainerSecurity method")
+//             },
 //             ReadDataSyncFunc: func() (*DataSync, error) {
 // 	               panic("mock out the ReadDataSync method")
 //             },
@@ -130,6 +133,9 @@ type ConfigReadWriterMock struct {
 	// ReadCodeReadyFunc mocks the ReadCodeReady method.
 	ReadCodeReadyFunc func() (*CodeReady, error)
 
+	// ReadContainerSecurityFunc mocks the ReadContainerSecurity method.
+	ReadContainerSecurityFunc func() (*ContainerSecurity, error)
+
 	// ReadDataSyncFunc mocks the ReadDataSync method.
 	ReadDataSyncFunc func() (*DataSync, error)
 
@@ -207,6 +213,9 @@ type ConfigReadWriterMock struct {
 		// ReadCodeReady holds details about calls to the ReadCodeReady method.
 		ReadCodeReady []struct {
 		}
+		// ReadContainerSecurity holds details about calls to the ReadContainerSecurity method.
+		ReadContainerSecurity []struct {
+		}
 		// ReadDataSync holds details about calls to the ReadDataSync method.
 		ReadDataSync []struct {
 		}
@@ -269,6 +278,7 @@ type ConfigReadWriterMock struct {
 	lockReadApicurito               sync.RWMutex
 	lockReadCloudResources          sync.RWMutex
 	lockReadCodeReady               sync.RWMutex
+	lockReadContainerSecurity       sync.RWMutex
 	lockReadDataSync                sync.RWMutex
 	lockReadFuse                    sync.RWMutex
 	lockReadFuseOnOpenshift         sync.RWMutex
@@ -543,6 +553,32 @@ func (mock *ConfigReadWriterMock) ReadCodeReadyCalls() []struct {
 	mock.lockReadCodeReady.RLock()
 	calls = mock.calls.ReadCodeReady
 	mock.lockReadCodeReady.RUnlock()
+	return calls
+}
+
+// ReadContainerSecurity calls ReadContainerSecurityFunc.
+func (mock *ConfigReadWriterMock) ReadContainerSecurity() (*ContainerSecurity, error) {
+	if mock.ReadContainerSecurityFunc == nil {
+		panic("ConfigReadWriterMock.ReadContainerSecurityFunc: method is nil but ConfigReadWriter.ReadContainerSecurity was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockReadContainerSecurity.Lock()
+	mock.calls.ReadContainerSecurity = append(mock.calls.ReadContainerSecurity, callInfo)
+	mock.lockReadContainerSecurity.Unlock()
+	return mock.ReadContainerSecurityFunc()
+}
+
+// ReadContainerSecurityCalls gets all the calls that were made to ReadContainerSecurity.
+// Check the length with:
+//     len(mockedConfigReadWriter.ReadContainerSecurityCalls())
+func (mock *ConfigReadWriterMock) ReadContainerSecurityCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockReadContainerSecurity.RLock()
+	calls = mock.calls.ReadContainerSecurity
+	mock.lockReadContainerSecurity.RUnlock()
 	return calls
 }
 
