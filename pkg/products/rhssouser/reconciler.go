@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	"regexp"
+	"strconv"
 
 	"strings"
 
@@ -52,6 +53,7 @@ var (
 	ssoType                   = "user sso"
 	postgresResourceName      = "rhssouser-postgres-rhmi"
 	routeName                 = "keycloak-edge"
+	usercount	              = 0
 )
 
 const (
@@ -385,56 +387,56 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	}
 
 	// TODO: bgbg - wrap this in non multi tea.
-	// Maybe create a function CreateSingleTenantRoles
-	//rolesConfigured, err := r.Config.GetDevelopersGroupConfigured()
-	//if err != nil {
-	//	return integreatlyv1alpha1.PhaseFailed, err
-	//}
-	//if !rolesConfigured {
-	//	_, err = r.reconcileDevelopersGroup(kc)
-	//	if err != nil {
-	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile rhmi-developers group: %w", err)
-	//	}
-	//
-	//	r.Config.SetDevelopersGroupConfigured(true)
-	//	err = r.ConfigManager.WriteConfig(r.Config)
-	//	if err != nil {
-	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("could not update keycloak config for user-sso: %w", err)
-	//	}
-	//}
+	//Maybe create a function CreateSingleTenantRoles
+	rolesConfigured, err := r.Config.GetDevelopersGroupConfigured()
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, err
+	}
+	if !rolesConfigured {
+		_, err = r.reconcileDevelopersGroup(kc)
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile rhmi-developers group: %w", err)
+		}
+	
+		r.Config.SetDevelopersGroupConfigured(true)
+		err = r.ConfigManager.WriteConfig(r.Config)
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("could not update keycloak config for user-sso: %w", err)
+		}
+	}
 
 	// TODO: bgbg - wrap this in non multi tea.
-	// Maybe create a function CreateSingleTenantUsers
-	// Reconcile dedicated-admins group
-	//_, err = r.reconcileDedicatedAdminsGroup(kc)
-	//if err != nil {
-	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile dedicated-admins group: %v", err)
-	//}
-	//
-	//// Get all currently existing keycloak users
-	//keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
-	//if err != nil {
-	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
-	//}
-	//
-	//// Sync keycloak with openshift users
-	//users, err := syncAdminUsersInMasterRealm(keycloakUsers, ctx, serverClient, r.Config.GetNamespace())
-	//if err != nil {
-	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to synchronize the users: %w", err)
-	//}
-	//
-	//// Create / update the synchronized users
-	//for _, user := range users {
-	//	if user.UserName == "" {
-	//		continue
-	//	}
-	//	or, err = r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
-	//	if err != nil {
-	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
-	//	} else {
-	//		r.Log.Infof("Operation result", l.Fields{"keycloakuser": user.UserName, "result": or})
-	//	}
-	//}
+	//Maybe create a function CreateSingleTenantUsers
+	//Reconcile dedicated-admins group
+	_, err = r.reconcileDedicatedAdminsGroup(kc)
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile dedicated-admins group: %v", err)
+	}
+	
+	// Get all currently existing keycloak users
+	keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
+	}
+	
+	// Sync keycloak with openshift users
+	users, err := syncAdminUsersInMasterRealm(keycloakUsers, ctx, serverClient, r.Config.GetNamespace())
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to synchronize the users: %w", err)
+	}
+	
+	// Create / update the synchronized users
+	for _, user := range users {
+		if user.UserName == "" {
+			continue
+		}
+		or, err = r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
+		} else {
+			r.Log.Infof("Operation result", l.Fields{"keycloakuser": user.UserName, "result": or})
+		}
+	}
 
 	// TODO: bgbg if mt
 	r.reconcileMultiTenantUsers(ctx, serverClient, r.Config.GetNamespace())
@@ -460,6 +462,16 @@ func (r *Reconciler) reconcileMultiTenantUsers(ctx context.Context, serverClient
 	opts := []k8sclient.ListOption{
 		k8sclient.InNamespace("toolchain-host-operator"),
 	}
+	//ua := v1alpha1.UserAccount{
+	//	TypeMeta:   metav1.TypeMeta{},
+	//	ObjectMeta: metav1.ObjectMeta{},
+	//	Spec:       v1alpha1.UserAccountSpec{
+	//		UserID:              "",
+	//		Disabled:            false,
+	//		UserAccountSpecBase: v1alpha1.UserAccountSpecBase{},
+	//	},
+	//	Status:     v1alpha1.UserAccountStatus{},
+	//}
 	users := v1alpha1.UserSignupList{}
 	err := serverClient.List(ctx, &users, opts...)
 	if err != nil {
@@ -487,7 +499,7 @@ func (r *Reconciler) reconcileMultiTenantUsers(ctx context.Context, serverClient
 			//
 			//}
 			//r.createTenantKCUser(ctx, serverClient, username, "user.Spec.Userid")
-			r.createTenantKCUser(ctx, serverClient, username, "user.Spec.Userid")
+			r.createTenantKCUser(ctx, serverClient, username, "userid"+(strconv.Itoa(usercount+1)))
 		}
 	}
 
@@ -545,6 +557,7 @@ func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8scli
 				},
 			},
 			ClientRoles: getTenantClientRoles(username),
+			RealmRoles: []string{"offline_access", "uma_authorization"},
 		}
 
 		return nil
@@ -601,13 +614,19 @@ func (r *Reconciler) createTenantRealm(ctx context.Context, serverClient k8sclie
 	or, err := controllerutil.CreateOrUpdate(ctx, serverClient, kcr, func() error {
 		kcr.Spec.InstanceSelector = &metav1.LabelSelector{
 			// TODO: confirm this is ok? What are labels used for?
-			MatchLabels: getMasterLabels(),
+			//MatchLabels: getMasterLabels(),
+			MatchLabels: map[string]string{
+				"tenant": username,
+			},
 		}
 
 		// The labels are needed so that created users can identify their realm
 		// with a selector
 		// TODO: confirm this is ok? What are labels used for?
-		kcr.Labels = getMasterLabels()
+		//kcr.Labels = getMasterLabels()
+		kcr.Labels = map[string]string{
+			"tenant": username,
+		}
 
 		kcr.Spec.Realm = &keycloak.KeycloakAPIRealm{
 			ID:          username,
@@ -791,7 +810,7 @@ func addKeycloakUsers(keycloakUsers []keycloak.KeycloakAPIUser, added []usersv1.
 					UserName:         osUser.Name,
 				},
 			},
-			RealmRoles: []string{"offline_access", "uma_authorization", "create-realm"},
+			RealmRoles: []string{"admin", "offline_access", "uma_authorization", "create-realm"},
 			ClientRoles: map[string][]string{
 				"account": {
 					"manage-account",

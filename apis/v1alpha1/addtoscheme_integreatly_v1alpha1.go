@@ -15,6 +15,7 @@ import (
 
 	crov1 "github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1"
 
+	toolchain "github.com/codeready-toolchain/api/pkg/apis/toolchain/v1alpha1"
 	grafanav1alpha1 "github.com/integr8ly/grafana-operator/v3/pkg/apis/integreatly/v1alpha1"
 
 	apicurioregistry "github.com/Apicurio/apicurio-registry-operator/pkg/apis/apicur/v1alpha1"
@@ -92,5 +93,6 @@ func init() {
 		discoveryservicev1.SchemeBuilder.AddToScheme,
 		apiextensionv1beta1.SchemeBuilder.AddToScheme,
 		apiextensionv1.SchemeBuilder.AddToScheme,
+		toolchain.SchemeBuilder.AddToScheme,
 	)
 }
