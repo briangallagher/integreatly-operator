@@ -3,10 +3,12 @@ package rhssouser
 import (
 	"context"
 	"fmt"
+	"github.com/codeready-toolchain/api/pkg/apis/toolchain/v1alpha1"
 	l "github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"github.com/integr8ly/integreatly-operator/pkg/resources/quota"
 	corev1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
+	"regexp"
 
 	"strings"
 
@@ -192,6 +194,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 
 	// Setting a name for keycloak-edge to "keycloak" for managed-api install type.
 	// This is done as the KCO route has been disabled, but if needs to be enabled in future, we won't have to change the route name.
+	// TODO: bg Do we need to include sandbox
 	if installation.Spec.Type == string(integreatlyv1alpha1.InstallationTypeManagedApi) {
 		routeName = "keycloak"
 	}
@@ -381,53 +384,249 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to reconcile first broker login authentication flow: %w", err)
 	}
 
-	rolesConfigured, err := r.Config.GetDevelopersGroupConfigured()
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, err
-	}
-	if !rolesConfigured {
-		_, err = r.reconcileDevelopersGroup(kc)
-		if err != nil {
-			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile rhmi-developers group: %w", err)
-		}
+	// TODO: bgbg - wrap this in non multi tea.
+	// Maybe create a function CreateSingleTenantRoles
+	//rolesConfigured, err := r.Config.GetDevelopersGroupConfigured()
+	//if err != nil {
+	//	return integreatlyv1alpha1.PhaseFailed, err
+	//}
+	//if !rolesConfigured {
+	//	_, err = r.reconcileDevelopersGroup(kc)
+	//	if err != nil {
+	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile rhmi-developers group: %w", err)
+	//	}
+	//
+	//	r.Config.SetDevelopersGroupConfigured(true)
+	//	err = r.ConfigManager.WriteConfig(r.Config)
+	//	if err != nil {
+	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("could not update keycloak config for user-sso: %w", err)
+	//	}
+	//}
 
-		r.Config.SetDevelopersGroupConfigured(true)
-		err = r.ConfigManager.WriteConfig(r.Config)
-		if err != nil {
-			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("could not update keycloak config for user-sso: %w", err)
-		}
-	}
-
+	// TODO: bgbg - wrap this in non multi tea.
+	// Maybe create a function CreateSingleTenantUsers
 	// Reconcile dedicated-admins group
-	_, err = r.reconcileDedicatedAdminsGroup(kc)
+	//_, err = r.reconcileDedicatedAdminsGroup(kc)
+	//if err != nil {
+	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile dedicated-admins group: %v", err)
+	//}
+	//
+	//// Get all currently existing keycloak users
+	//keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
+	//if err != nil {
+	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
+	//}
+	//
+	//// Sync keycloak with openshift users
+	//users, err := syncAdminUsersInMasterRealm(keycloakUsers, ctx, serverClient, r.Config.GetNamespace())
+	//if err != nil {
+	//	return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to synchronize the users: %w", err)
+	//}
+	//
+	//// Create / update the synchronized users
+	//for _, user := range users {
+	//	if user.UserName == "" {
+	//		continue
+	//	}
+	//	or, err = r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
+	//	if err != nil {
+	//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
+	//	} else {
+	//		r.Log.Infof("Operation result", l.Fields{"keycloakuser": user.UserName, "result": or})
+	//	}
+	//}
+
+	// TODO: bgbg if mt
+	r.reconcileMultiTenantUsers(ctx, serverClient, r.Config.GetNamespace())
 	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile dedicated-admins group: %v", err)
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling multi tenant users: %w", err)
 	}
 
-	// Get all currently existing keycloak users
-	keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+func (r *Reconciler) reconcileMultiTenantUsers(ctx context.Context, serverClient k8sclient.Client, ns string) (integreatlyv1alpha1.StatusPhase, error) {
+	//bgbg
+
+	// Get all user sign ups
+	//spec:
+		//familyName: User 05
+		//givenName: Test
+		//states:
+		//	- approved
+		//userid: f9359956-39e8-4d1b-902b-fb8d99b003c0
+		//username: test-user05
+
+	opts := []k8sclient.ListOption{
+		k8sclient.InNamespace("toolchain-host-operator"),
+	}
+	users := v1alpha1.UserSignupList{}
+	err := serverClient.List(ctx, &users, opts...)
 	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
+		r.Log.Error("Error getting usersignups", err)
+		return integreatlyv1alpha1.PhaseFailed, nil
+	}
+	options := &k8sclient.ListOptions{
+		Namespace: ns,
+	}
+	realms := &keycloak.KeycloakRealmList{}
+	err = serverClient.List(ctx, realms, options)
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, nil
 	}
 
-	// Sync keycloak with openshift users
-	users, err := syncAdminUsersInMasterRealm(keycloakUsers, ctx, serverClient, r.Config.GetNamespace())
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to synchronize the users: %w", err)
-	}
-
-	// Create / update the synchronized users
-	for _, user := range users {
-		if user.UserName == "" {
-			continue
+	for _, user := range users.Items {
+		if !realmExists(*realms, user) {
+			username := getValidTenantUsername(user.Spec.Username)
+			_, err := r.createTenantRealm(ctx, serverClient, username)
+			if (err != nil) {
+				return integreatlyv1alpha1.PhaseFailed, nil
+			}
+			// TODO:
+			//if (phase != ) {
+			//
+			//}
+			//r.createTenantKCUser(ctx, serverClient, username, "user.Spec.Userid")
+			r.createTenantKCUser(ctx, serverClient, username, "user.Spec.Userid")
 		}
-		or, err = r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
-		if err != nil {
-			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
-		} else {
-			r.Log.Infof("Operation result", l.Fields{"keycloakuser": user.UserName, "result": or})
+	}
+
+	// Get all user sign ups
+	// Get all realms
+	// Check if a realm CR exists
+	// If not create a realm
+	// Then create a keycloak user CR
+		// With all the required permissions
+
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+func realmExists(realms keycloak.KeycloakRealmList, user v1alpha1.UserSignup) bool {
+	for _, realm := range realms.Items {
+		// TODO: this might not be the best comparison (not unique enough)
+		if (realm.Spec.Realm.Realm == user.Spec.Username) {
+			return true
 		}
 	}
+	return false
+}
+
+func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8sclient.Client, username string, userid string) (integreatlyv1alpha1.StatusPhase, error) {
+
+	// TODO: May need to wait until realm client available
+
+	// TODO: where to get emial or generate // email = osUser.Name + "@rhmi.io"
+	email := username + "@gmail.com"
+
+	kcUser := &keycloak.KeycloakUser{
+		ObjectMeta: metav1.ObjectMeta{
+			// TODO: review need for: 	userHelper.GetValidGeneratedUserName
+			Name:      username,
+			Namespace: r.Config.GetNamespace(),
+		},
+	}
+
+	controllerutil.CreateOrUpdate(ctx, serverClient, kcUser, func() error {
+		kcUser.Spec.RealmSelector = &metav1.LabelSelector{
+			MatchLabels: getMasterLabels(),
+		}
+		kcUser.Labels = getMasterLabels()
+		kcUser.Spec.User = keycloak.KeycloakAPIUser{
+			Enabled:       true,
+			UserName:      username,
+			EmailVerified: true,
+			Email:         email,
+			FederatedIdentities: []keycloak.FederatedIdentity{
+				{
+					IdentityProvider: idpAlias,
+					// TODO: need to figure out where we can get this.
+					UserID:           userid,
+					UserName:         username,
+				},
+			},
+			ClientRoles: getTenantClientRoles(username),
+		}
+
+		return nil
+	})
+	// TODO: do we need this?
+	// userHelper.AppendUpdateProfileActionForUserWithoutEmail(&newKeycloakUser)
+
+	//keycloakUsers[index].ClientRoles = getKeycloakRoles()
+
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+func getValidTenantUsername(username string) string {
+	// Regex for only alphanumeric values
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+	// Replace all non-alphanumeric values with the replacement character
+	validUsername := reg.ReplaceAllString(strings.ToLower(username), "-")
+	// Remove occurrence of replacement character at end of string
+	return strings.TrimSuffix(validUsername, "-")
+}
+
+func getTenantClientRoles(realm string) map[string][]string {
+	return  map[string][]string{
+		realm: {
+			"create-client",
+			"manage-authorization",
+			"manage-clients",
+			"manage-events",
+			"manage-identity-providers",
+			"manage-realm",
+			"manage-users",
+			"query-clients",
+			"query-groups",
+			"query-realms",
+			"query-users",
+			"view-authorization",
+			"view-clients",
+			"view-events",
+			"view-identity-providers",
+			"view-realm",
+			"view-users",
+		},
+	}
+}
+
+func (r *Reconciler) createTenantRealm(ctx context.Context, serverClient k8sclient.Client, username string) (integreatlyv1alpha1.StatusPhase, error) {
+	r.Log.Infof("Creating tenant realm", l.Fields{"tenant": username})
+	kcr := &keycloak.KeycloakRealm{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      username,
+			Namespace: r.Config.GetNamespace(),
+		},
+	}
+	or, err := controllerutil.CreateOrUpdate(ctx, serverClient, kcr, func() error {
+		kcr.Spec.InstanceSelector = &metav1.LabelSelector{
+			// TODO: confirm this is ok? What are labels used for?
+			MatchLabels: getMasterLabels(),
+		}
+
+		// The labels are needed so that created users can identify their realm
+		// with a selector
+		// TODO: confirm this is ok? What are labels used for?
+		kcr.Labels = getMasterLabels()
+
+		kcr.Spec.Realm = &keycloak.KeycloakAPIRealm{
+			ID:          username,
+			Realm:       username,
+			Enabled:     true,
+			DisplayName: username,
+			EventsListeners: []string{
+				"metrics-listener",
+			},
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		r.Log.Errorf("Failed create/update", l.Fields{"realm": username}, err)
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update keycloak realm: %w", err)
+	}
+	r.Log.Infof("Operation result", l.Fields{"keycloakrealm": kcr.Name, "result": or})
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }

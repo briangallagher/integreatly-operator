@@ -14,6 +14,7 @@ require (
 	github.com/apicurio/apicurio-operators/apicurito v0.0.0-20200123142409-83e0a91dd6be
 	github.com/aws/aws-sdk-go v1.39.2
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/codeready-toolchain/api v0.0.0-20210709111327-e401230fae46
 	github.com/coreos/prometheus-operator v0.40.0
 	github.com/eclipse/che-operator v0.0.0-20201214125341-cce874092f25
 	github.com/envoyproxy/go-control-plane v0.9.7
@@ -52,12 +53,13 @@ require (
 	k8s.io/apiextensions-apiserver v0.20.2
 	k8s.io/apimachinery v0.20.6
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
+	k8s.io/kube-openapi v0.0.0-20210527164424-3c818078ee3d
 	sigs.k8s.io/controller-runtime v0.8.3
 	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (
+	github.com/codeready-toolchain/api => github.com/codeready-toolchain/api v0.0.0-20201014092514-6d7ff7b187fa
 	github.com/coreos/prometheus-operator => github.com/coreos/prometheus-operator v0.38.3
 	github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210105115604-44119421ec6b

@@ -126,6 +126,9 @@ github.com/che-incubator/kubernetes-image-puller-operator/pkg/apis/che/v1alpha1
 # github.com/cncf/udpa/go v0.0.0-20201001150855-7e6fe0510fb5
 github.com/cncf/udpa/go/udpa/annotations
 github.com/cncf/udpa/go/udpa/core/v1
+# github.com/codeready-toolchain/api v0.0.0-20210709111327-e401230fae46 => github.com/codeready-toolchain/api v0.0.0-20201014092514-6d7ff7b187fa
+## explicit
+github.com/codeready-toolchain/api/pkg/apis/toolchain/v1alpha1
 # github.com/coreos/prometheus-operator v0.40.0 => github.com/coreos/prometheus-operator v0.38.3
 ## explicit
 github.com/coreos/prometheus-operator/pkg/apis/monitoring
@@ -1010,7 +1013,7 @@ k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.17.3 => k8s.io/kube-aggregator v0.20.6
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-# k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd => k8s.io/kube-openapi v0.0.0-20210113000636-45edf8a2a574
+# k8s.io/kube-openapi v0.0.0-20210527164424-3c818078ee3d => k8s.io/kube-openapi v0.0.0-20210113000636-45edf8a2a574
 ## explicit
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
@@ -1080,6 +1083,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 ## explicit
 sigs.k8s.io/yaml
+# github.com/codeready-toolchain/api => github.com/codeready-toolchain/api v0.0.0-20201014092514-6d7ff7b187fa
 # github.com/coreos/prometheus-operator => github.com/coreos/prometheus-operator v0.38.3
 # github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 # github.com/openshift/api => github.com/openshift/api v0.0.0-20210105115604-44119421ec6b
