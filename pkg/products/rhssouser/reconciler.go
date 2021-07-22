@@ -375,11 +375,11 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		}
 	}
 
-	phase, err := r.reconcileBrowserAuthFlow(ctx, kc, serverClient)
-	if err != nil || phase != integreatlyv1alpha1.PhaseCompleted {
-		events.HandleError(r.Recorder, installation, phase, "Failed to reconcile browser authentication flow", err)
-		return phase, err
-	}
+	//phase, err := r.reconcileBrowserAuthFlow(ctx, kc, serverClient)
+	//if err != nil || phase != integreatlyv1alpha1.PhaseCompleted {
+	//	events.HandleError(r.Recorder, installation, phase, "Failed to reconcile browser authentication flow", err)
+	//	return phase, err
+	//}
 
 	_, err = r.reconcileFirstLoginAuthFlow(kc)
 	if err != nil {
@@ -1033,43 +1033,43 @@ func OsUserInDedicatedAdmins(dedicatedAdmins []string, kcUser keycloak.KeycloakA
 // Add authenticator config to the master realm. Because it is the master realm we need to make direct calls
 // with the Keycloak client. This config allows for the automatic redirect to openshift-v4 as the IDP for Keycloak,
 // as apposed to presenting the user with multiple login options.
-func (r *Reconciler) reconcileBrowserAuthFlow(ctx context.Context, kc *keycloak.Keycloak, client k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
-
-	kcClient, err := r.KeycloakClientFactory.AuthenticatedClient(*kc)
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, err
-	}
-
-	executions, err := kcClient.ListAuthenticationExecutionsForFlow("browser", masterRealmName)
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to retrieve execution flows on master realm: %w", err)
-	}
-
-	executionID := ""
-	for _, execution := range executions {
-		if execution.ProviderID == "identity-provider-redirector" {
-			if execution.AuthenticationConfig != "" {
-				r.Log.Info("Authenticator Config exists on master realm, rhsso-user")
-				return integreatlyv1alpha1.PhaseCompleted, nil
-			}
-			executionID = execution.ID
-			break
-		}
-	}
-	if executionID == "" {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to find relevant ProviderID in Authentication Executions: %w", err)
-	}
-
-	config := keycloak.AuthenticatorConfig{Config: map[string]string{"defaultProvider": "openshift-v4"}, Alias: "openshift-v4"}
-	_, err = kcClient.CreateAuthenticatorConfig(&config, masterRealmName, executionID)
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to create Authenticator Config: %w", err)
-	}
-
-	r.Log.Info("Successfully created Authenticator Config")
-
-	return integreatlyv1alpha1.PhaseCompleted, nil
-}
+//func (r *Reconciler) reconcileBrowserAuthFlow(ctx context.Context, kc *keycloak.Keycloak, client k8sclient.Client) (integreatlyv1alpha1.StatusPhase, error) {
+//
+//	kcClient, err := r.KeycloakClientFactory.AuthenticatedClient(*kc)
+//	if err != nil {
+//		return integreatlyv1alpha1.PhaseFailed, err
+//	}
+//
+//	executions, err := kcClient.ListAuthenticationExecutionsForFlow("browser", masterRealmName)
+//	if err != nil {
+//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to retrieve execution flows on master realm: %w", err)
+//	}
+//
+//	executionID := ""
+//	for _, execution := range executions {
+//		if execution.ProviderID == "identity-provider-redirector" {
+//			if execution.AuthenticationConfig != "" {
+//				r.Log.Info("Authenticator Config exists on master realm, rhsso-user")
+//				return integreatlyv1alpha1.PhaseCompleted, nil
+//			}
+//			executionID = execution.ID
+//			break
+//		}
+//	}
+//	if executionID == "" {
+//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to find relevant ProviderID in Authentication Executions: %w", err)
+//	}
+//
+//	config := keycloak.AuthenticatorConfig{Config: map[string]string{"defaultProvider": "openshift-v4"}, Alias: "openshift-v4"}
+//	_, err = kcClient.CreateAuthenticatorConfig(&config, masterRealmName, executionID)
+//	if err != nil {
+//		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to create Authenticator Config: %w", err)
+//	}
+//
+//	r.Log.Info("Successfully created Authenticator Config")
+//
+//	return integreatlyv1alpha1.PhaseCompleted, nil
+//}
 
 // Create a default group called `rhmi-developers` with the "view-realm" client role and
 // the "create-realm" realm role
