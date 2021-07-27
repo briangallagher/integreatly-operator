@@ -245,6 +245,51 @@ func TestReconciler_config(t *testing.T) {
 	}
 }
 
+func TestReconciler_reconcileTenants(t *testing.T) {
+
+
+	cases := []struct {
+		Name                  string
+		FakeClient            k8sclient.Client
+		FakeOauthClient       oauthClient.OauthV1Interface
+		FakeConfig            *config.ConfigReadWriterMock
+		Installation          *integreatlyv1alpha1.RHMI
+		ExpectError           bool
+		ExpectedError         string
+		ExpectedStatus        integreatlyv1alpha1.StatusPhase
+		FakeMPM               *marketplace.MarketplaceInterfaceMock
+		Recorder              record.EventRecorder
+		ApiUrl                string
+		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
+		ProductConfig         *quota.ProductConfigMock
+	}{
+		{
+			Name:            "Test reconcile custom resource returns completed when successful created",
+			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, githubOauthSecret, kcr, kc, group, croPostgres, croPostgresSecret),
+			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
+			FakeConfig:      basicConfigMock(),
+			Installation: &integreatlyv1alpha1.RHMI{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "RHMI",
+					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+				},
+				ObjectMeta: controllerruntime.ObjectMeta{
+					Namespace: defaultOperatorNamespace,
+				},
+			},
+			ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+	}
+}
+
 func TestReconciler_reconcileComponents(t *testing.T) {
 	scheme, err := getBuildScheme()
 	if err != nil {

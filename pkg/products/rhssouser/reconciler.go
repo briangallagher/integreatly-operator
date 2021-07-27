@@ -3,14 +3,11 @@ package rhssouser
 import (
 	"context"
 	"fmt"
-	"github.com/codeready-toolchain/api/pkg/apis/toolchain/v1alpha1"
 	l "github.com/integr8ly/integreatly-operator/pkg/resources/logger"
 	"github.com/integr8ly/integreatly-operator/pkg/resources/quota"
 	corev1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	"regexp"
-	"strconv"
-
 	"strings"
 
 	"github.com/integr8ly/integreatly-operator/pkg/products/rhssocommon"
@@ -385,8 +382,34 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Failed to reconcile first broker login authentication flow: %w", err)
 	}
 
-	// TODO: bgbg - wrap this in non multi tea.
-	//Maybe create a function CreateSingleTenantRoles
+	// Get all currently existing keycloak users
+	keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
+	}
+
+	if (integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(installation.Spec.Type))) {
+		r.reconcileTenants(ctx, serverClient, r.Config.GetNamespace())
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling multi tenant users: %w", err)
+		}
+	} else {
+		// single tenant
+		r.reconcileGroups(ctx, serverClient, kc)
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
+		r.reconcileAdminUsers(ctx, serverClient, keycloakUsers)
+		if err != nil {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
+	}
+
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+func (r *Reconciler) reconcileGroups(ctx context.Context, serverClient k8sclient.Client, kc *keycloak.Keycloak) (integreatlyv1alpha1.StatusPhase, error) {
+
 	rolesConfigured, err := r.Config.GetDevelopersGroupConfigured()
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, err
@@ -396,7 +419,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile rhmi-developers group: %w", err)
 		}
-	
+
 		r.Config.SetDevelopersGroupConfigured(true)
 		err = r.ConfigManager.WriteConfig(r.Config)
 		if err != nil {
@@ -404,32 +427,28 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		}
 	}
 
-	// TODO: bgbg - wrap this in non multi tea.
-	//Maybe create a function CreateSingleTenantUsers
-	//Reconcile dedicated-admins group
 	_, err = r.reconcileDedicatedAdminsGroup(kc)
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to reconcile dedicated-admins group: %v", err)
 	}
-	
-	// Get all currently existing keycloak users
-	keycloakUsers, err := GetKeycloakUsers(ctx, serverClient, r.Config.GetNamespace())
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to list the keycloak users: %w", err)
-	}
-	
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+
+func (r *Reconciler) reconcileAdminUsers(ctx context.Context, serverClient k8sclient.Client, keycloakUsers []keycloak.KeycloakAPIUser) (integreatlyv1alpha1.StatusPhase, error) {
+
 	// Sync keycloak with openshift users
 	users, err := syncAdminUsersInMasterRealm(keycloakUsers, ctx, serverClient, r.Config.GetNamespace())
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to synchronize the users: %w", err)
 	}
-	
+
 	// Create / update the synchronized users
 	for _, user := range users {
 		if user.UserName == "" {
 			continue
 		}
-		or, err = r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
+		or, err := r.createOrUpdateKeycloakAdmin(user, ctx, serverClient)
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update the customer admin user: %w", err)
 		} else {
@@ -437,46 +456,18 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 		}
 	}
 
-	// TODO: bgbg if mt
-	r.reconcileMultiTenantUsers(ctx, serverClient, r.Config.GetNamespace())
-	if err != nil {
-		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling multi tenant users: %w", err)
-	}
-
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
-func (r *Reconciler) reconcileMultiTenantUsers(ctx context.Context, serverClient k8sclient.Client, ns string) (integreatlyv1alpha1.StatusPhase, error) {
-	//bgbg
+func (r *Reconciler) reconcileTenants(ctx context.Context, serverClient k8sclient.Client, ns string) (integreatlyv1alpha1.StatusPhase, error) {
 
-	// Get all user sign ups
-	//spec:
-		//familyName: User 05
-		//givenName: Test
-		//states:
-		//	- approved
-		//userid: f9359956-39e8-4d1b-902b-fb8d99b003c0
-		//username: test-user05
-
-	opts := []k8sclient.ListOption{
-		k8sclient.InNamespace("toolchain-host-operator"),
-	}
-	//ua := v1alpha1.UserAccount{
-	//	TypeMeta:   metav1.TypeMeta{},
-	//	ObjectMeta: metav1.ObjectMeta{},
-	//	Spec:       v1alpha1.UserAccountSpec{
-	//		UserID:              "",
-	//		Disabled:            false,
-	//		UserAccountSpecBase: v1alpha1.UserAccountSpecBase{},
-	//	},
-	//	Status:     v1alpha1.UserAccountStatus{},
-	//}
-	users := v1alpha1.UserSignupList{}
-	err := serverClient.List(ctx, &users, opts...)
+	users := &usersv1.UserList{}
+	users, err := userHelper.GetMultiTenantUsers2(ctx, serverClient)
 	if err != nil {
-		r.Log.Error("Error getting usersignups", err)
+		r.Log.Error("Error getting multi tenant users", err)
 		return integreatlyv1alpha1.PhaseFailed, nil
 	}
+
 	options := &k8sclient.ListOptions{
 		Namespace: ns,
 	}
@@ -486,78 +477,135 @@ func (r *Reconciler) reconcileMultiTenantUsers(ctx context.Context, serverClient
 		return integreatlyv1alpha1.PhaseFailed, nil
 	}
 
-	for _, user := range users.Items {
-		if !realmExists(*realms, user) {
-			username := getValidTenantUsername(user.Spec.Username)
-			_, err := r.createTenantRealm(ctx, serverClient, username)
-			if (err != nil) {
-				return integreatlyv1alpha1.PhaseFailed, nil
-			}
-			// TODO:
-			//if (phase != ) {
-			//
-			//}
-			//r.createTenantKCUser(ctx, serverClient, username, "user.Spec.Userid")
-			r.createTenantKCUser(ctx, serverClient, username, "userid"+(strconv.Itoa(usercount+1)))
+	// TODO: get user diff, added / deleted
+	added, deleted := getTenantDiff(users.Items, realms.Items)
+
+	for _, user := range added {
+		_, err := r.createTenantRealm(ctx, serverClient, user.Name)
+		if (err != nil) {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
+		_, err = r.createTenantKCUser(ctx, serverClient, user)
+		if (err != nil) {
+			return integreatlyv1alpha1.PhaseFailed, err
 		}
 	}
 
-	// Get all user sign ups
-	// Get all realms
-	// Check if a realm CR exists
-	// If not create a realm
-	// Then create a keycloak user CR
-		// With all the required permissions
+	for _, realm := range deleted {
+		_, err := r.deleteTenant(ctx, serverClient, realm)
+		if (err != nil) {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
+	}
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
-func realmExists(realms keycloak.KeycloakRealmList, user v1alpha1.UserSignup) bool {
-	for _, realm := range realms.Items {
-		// TODO: this might not be the best comparison (not unique enough)
-		if (realm.Spec.Realm.Realm == user.Spec.Username) {
+// Deleting a tenant involves deleting the kcrealm and the kcuser
+func (r *Reconciler) deleteTenant(ctx context.Context, serverClient k8sclient.Client, realm keycloak.KeycloakRealm) (integreatlyv1alpha1.StatusPhase, error) {
+
+	// Delete the Keycloak User
+	kcUser := &keycloak.KeycloakUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      realm.Name,
+			Namespace: r.Config.GetNamespace(),
+		},
+	}
+	err := serverClient.Delete(ctx, kcUser)
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to delete keycloak user: %w", err)
+	}
+
+	// Delete the Realm
+	realm.SetFinalizers([]string{})
+	err = serverClient.Update(ctx, &realm)
+	if !k8serr.IsNotFound(err) && err != nil {
+		r.Log.Error("Error removing finalizer from Realm", err)
+		return integreatlyv1alpha1.PhaseFailed, err
+	}
+	err = serverClient.Delete(ctx, &realm)
+	if err != nil {
+		return integreatlyv1alpha1.PhaseFailed, err
+	}
+
+
+	return integreatlyv1alpha1.PhaseCompleted, nil
+}
+
+func getTenantDiff(users []usersv1.User, realms []keycloak.KeycloakRealm) (added []usersv1.User, deleted []keycloak.KeycloakRealm) {
+
+	for _, user := range users {
+		if (!realmExistsForTenant(realms, user)) {
+			// If the user exists but the realm does not, then its a new tenant that needs a realm in KC
+			added = append(added, user)
+		}
+	}
+	for _, realm := range realms {
+		if (realm.Name != "master") {
+			if (!userExistsForRealm(users, realm)) {
+				// If the user has been removed from openshift but there is still a realm we need to clean up
+				deleted = append(deleted, realm)
+			}
+		}
+	}
+
+	return added, deleted
+}
+
+
+func realmExistsForTenant(realms []keycloak.KeycloakRealm, user usersv1.User) bool {
+	for _, realm := range realms {
+		if (realm.Name == user.Name) {
 			return true
 		}
 	}
 	return false
 }
 
-func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8sclient.Client, username string, userid string) (integreatlyv1alpha1.StatusPhase, error) {
+func userExistsForRealm(users []usersv1.User, realm keycloak.KeycloakRealm) bool {
+	for _, user := range users {
+		if (realm.Name == user.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8sclient.Client, user usersv1.User) (integreatlyv1alpha1.StatusPhase, error) {
 
 	// TODO: May need to wait until realm client available
 
-	// TODO: where to get emial or generate // email = osUser.Name + "@rhmi.io"
-	email := username + "@gmail.com"
+	// TODO: get email from identity
+	email := user.Name + "@gmail.com"
 
 	kcUser := &keycloak.KeycloakUser{
 		ObjectMeta: metav1.ObjectMeta{
-			// TODO: review need for: 	userHelper.GetValidGeneratedUserName
-			Name:      username,
+			Name:      user.Name,
 			Namespace: r.Config.GetNamespace(),
 		},
 	}
 
-	controllerutil.CreateOrUpdate(ctx, serverClient, kcUser, func() error {
+	or, err := controllerutil.CreateOrUpdate(ctx, serverClient, kcUser, func() error {
 		kcUser.Spec.RealmSelector = &metav1.LabelSelector{
 			MatchLabels: getMasterLabels(),
 		}
 		kcUser.Labels = map[string]string{
-			"sso": username,
+			"sso": user.Name,
 		}
 		kcUser.Spec.User = keycloak.KeycloakAPIUser{
 			Enabled:       true,
-			UserName:      username,
+			UserName:      user.Name,
 			EmailVerified: true,
 			Email:         email,
 			FederatedIdentities: []keycloak.FederatedIdentity{
 				{
 					IdentityProvider: idpAlias,
 					// TODO: need to figure out where we can get this.
-					UserID:           getUserId(ctx, serverClient, username),
-					UserName:         username,
+					UserID:           string(user.UID),
+					UserName:         user.Name,
 				},
 			},
-			ClientRoles: getTenantClientRoles(username+"-realm"),
+			ClientRoles: getTenantClientRoles(user.Name+"-realm"),
 			RealmRoles: []string{"offline_access", "uma_authorization"},
 		}
 
@@ -566,7 +614,10 @@ func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8scli
 	// TODO: do we need this?
 	// userHelper.AppendUpdateProfileActionForUserWithoutEmail(&newKeycloakUser)
 
-	//keycloakUsers[index].ClientRoles = getKeycloakRoles()
+	if (err != nil) {
+		return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("failed to create/update keycloak tenant user: %w", err)
+	}
+	r.Log.Infof("Operation result", l.Fields{"keycloak user": kcUser.Name, "res": or})
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }

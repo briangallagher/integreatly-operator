@@ -156,6 +156,15 @@ func GetIdentities(ctx context.Context, serverClient k8sclient.Client, user user
 	return identities, nil
 }
 
+func GetMultiTenantUsers2(ctx context.Context, serverClient k8sclient.Client) (*usersv1.UserList, error) {
+	openshiftUsers := &usersv1.UserList{}
+	err := serverClient.List(ctx, openshiftUsers)
+	if (err != nil) {
+		return nil, fmt.Errorf("Error getting users.")
+	}
+	return openshiftUsers, nil
+}
+
 func GetMultiTenantUsers(ctx context.Context, serverClient k8sclient.Client) (*usersv1.UserList, error) {
 
 	exclusionGroups = append(exclusionGroups, "dedicated-admin")
