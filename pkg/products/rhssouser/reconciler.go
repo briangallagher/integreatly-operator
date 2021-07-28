@@ -587,7 +587,9 @@ func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8scli
 
 	or, err := controllerutil.CreateOrUpdate(ctx, serverClient, kcUser, func() error {
 		kcUser.Spec.RealmSelector = &metav1.LabelSelector{
-			MatchLabels: getMasterLabels(),
+			MatchLabels: map[string]string{
+				masterRealmLabelKey: user.Name,
+			},
 		}
 		kcUser.Labels = map[string]string{
 			"sso": user.Name,
@@ -605,7 +607,7 @@ func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8scli
 					UserName:         user.Name,
 				},
 			},
-			ClientRoles: getTenantClientRoles(user.Name+"-realm"),
+			ClientRoles: getTenantClientRoles("realm-managers"),
 			RealmRoles: []string{"offline_access", "uma_authorization"},
 		}
 
@@ -680,7 +682,15 @@ func (r *Reconciler) createTenantRealm(ctx context.Context, serverClient k8sclie
 			Namespace: r.Config.GetNamespace(),
 		},
 	}
+
 	or, err := controllerutil.CreateOrUpdate(ctx, serverClient, kcr, func() error {
+		kcr.Spec.RealmOverrides = []*keycloak.RedirectorIdentityProviderOverride{
+			{
+				IdentityProvider: idpAlias,
+				ForFlow:          "browser",
+			},
+		}
+
 		kcr.Spec.InstanceSelector = &metav1.LabelSelector{
 			MatchLabels: getMasterLabels(),
 		}
@@ -694,6 +704,15 @@ func (r *Reconciler) createTenantRealm(ctx context.Context, serverClient k8sclie
 			Realm:       username,
 			Enabled:     true,
 			DisplayName: username,
+		}
+
+		// The identity providers need to be set up before the realm CR gets
+		// created because the Keycloak operator does not allow updates to
+		// the realms
+		redirectURIs := []string{r.Config.GetHost() + "/auth/realms/" + username + "/broker/openshift-v4/endpoint"}
+		err := r.SetupOpenshiftIDP(ctx, serverClient, r.Installation, r.Config, kcr, redirectURIs, username)
+		if err != nil {
+			return fmt.Errorf("failed to setup Openshift IDP for user-sso: %w", err)
 		}
 
 		return nil
@@ -776,7 +795,7 @@ func (r *Reconciler) updateMasterRealm(ctx context.Context, serverClient k8sclie
 		// created because the Keycloak operator does not allow updates to
 		// the realms
 		redirectURIs := []string{r.Config.GetHost() + "/auth/realms/" + masterRealmName + "/broker/openshift-v4/endpoint"}
-		err := r.SetupOpenshiftIDP(ctx, serverClient, installation, r.Config, kcr, redirectURIs)
+		err := r.SetupOpenshiftIDP(ctx, serverClient, installation, r.Config, kcr, redirectURIs, "")
 		if err != nil {
 			return fmt.Errorf("failed to setup Openshift IDP for user-sso: %w", err)
 		}
