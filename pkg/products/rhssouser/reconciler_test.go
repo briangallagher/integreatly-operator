@@ -272,9 +272,18 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 		},
 	}
 
-	kcrs :=
+	kcrs := keycloak.KeycloakRealmList{
+		Items:    []keycloak.KeycloakRealm{
+			*getKcr(keycloak.KeycloakRealmStatus{
+				Phase: keycloak.PhaseReconciling,
+			}, "user1"),
+			*getKcr(keycloak.KeycloakRealmStatus{
+				Phase: keycloak.PhaseReconciling,
+			}, "user2"),
+		},
+	}
 
-	//		getKcr(keycloak.KeycloakRealmStatus{
+	//getKcr(keycloak.KeycloakRealmStatus{
 	//	Phase: keycloak.PhaseReconciling,
 	//}, "user1")
 
@@ -303,7 +312,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 	}{
 		{
 			Name:            "Test reconcile tenant kcrealm and tenant kcuser creation",
-			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, kcrs, kc),
+			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, &kcrs, kc),
 			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 			FakeConfig:      basicConfigMock(),
 			Installation: &integreatlyv1alpha1.RHMI{
@@ -1003,14 +1012,14 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 func getKcr(status keycloak.KeycloakRealmStatus, name string) *keycloak.KeycloakRealm {
 	return &keycloak.KeycloakRealm{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      masterRealmName,
+			Name:      name,
 			Namespace: defaultNamespace,
 		},
 		Spec: keycloak.KeycloakRealmSpec{
 			Realm: &keycloak.KeycloakAPIRealm{
-				ID:          masterRealmName,
-				Realm:       masterRealmName,
-				DisplayName: masterRealmName,
+				ID:          name,
+				Realm:       name,
+				DisplayName: name,
 				Enabled:     true,
 				EventsListeners: []string{
 					"metrics-listener",
