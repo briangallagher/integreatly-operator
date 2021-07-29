@@ -324,10 +324,10 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 
 	var kcr1 = getKcr(keycloak.KeycloakRealmStatus{
 		Phase: keycloak.PhaseReconciling,
-	}, "user1")
+	}, "user1", "redhat-rhoam-user-sso")
 	var kcr2 = getKcr(keycloak.KeycloakRealmStatus{
 		Phase: keycloak.PhaseReconciling,
-	}, "user2")
+	}, "user2", "redhat-rhoam-user-sso")
 
 	kcrs := keycloak.KeycloakRealmList{
 		Items:    []keycloak.KeycloakRealm{},
@@ -471,7 +471,7 @@ func TestReconciler_reconcileComponents(t *testing.T) {
 
 	kcr := getKcr(keycloak.KeycloakRealmStatus{
 		Phase: keycloak.PhaseReconciling,
-	}, masterRealmName)
+	}, masterRealmName, "user-sso")
 
 	githubOauthSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -779,7 +779,7 @@ func TestReconciler_full_RHMI_Reconcile(t *testing.T) {
 		{
 			Name:            "test successful reconcile",
 			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName,"user-sso"), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
 			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 			FakeConfig:      basicConfigMock(),
 			FakeMPM: &marketplace.MarketplaceInterfaceMock{
@@ -1012,7 +1012,7 @@ func TestReconciler_full_RHOAM_Reconcile(t *testing.T) {
 		{
 			Name:            "RHOAM - test successful reconcile",
 			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName, "user-sso"), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
 			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 			FakeConfig:      basicConfigMock(),
 			FakeMPM: &marketplace.MarketplaceInterfaceMock{
@@ -1084,11 +1084,11 @@ func TestReconciler_full_RHOAM_Reconcile(t *testing.T) {
 	}
 }
 
-func getKcr(status keycloak.KeycloakRealmStatus, name string) *keycloak.KeycloakRealm {
+func getKcr(status keycloak.KeycloakRealmStatus, name string, ns string) *keycloak.KeycloakRealm {
 	return &keycloak.KeycloakRealm{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "redhat-rhoam-user-sso",
+			Namespace: ns,
 		},
 		Spec: keycloak.KeycloakRealmSpec{
 			Realm: &keycloak.KeycloakAPIRealm{
