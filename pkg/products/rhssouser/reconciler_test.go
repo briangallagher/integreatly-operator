@@ -272,9 +272,11 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 		},
 	}
 
-	kcr := getKcr(keycloak.KeycloakRealmStatus{
-		Phase: keycloak.PhaseReconciling,
-	})
+	kcrs :=
+
+	//		getKcr(keycloak.KeycloakRealmStatus{
+	//	Phase: keycloak.PhaseReconciling,
+	//}, "user1")
 
 	kc := &keycloak.Keycloak{
 		ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +303,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 	}{
 		{
 			Name:            "Test reconcile tenant kcrealm and tenant kcuser creation",
-			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, kcr, kc),
+			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, kcrs, kc),
 			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 			FakeConfig:      basicConfigMock(),
 			Installation: &integreatlyv1alpha1.RHMI{
@@ -385,7 +387,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 //
 //	kcr := getKcr(keycloak.KeycloakRealmStatus{
 //		Phase: keycloak.PhaseReconciling,
-//	})
+//	}, masterRealmName)
 //
 //	githubOauthSecret := &corev1.Secret{
 //		ObjectMeta: metav1.ObjectMeta{
@@ -693,7 +695,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 //		{
 //			Name:            "test successful reconcile",
 //			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
 //			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 //			FakeConfig:      basicConfigMock(),
 //			FakeMPM: &marketplace.MarketplaceInterfaceMock{
@@ -926,7 +928,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 //		{
 //			Name:            "RHOAM - test successful reconcile",
 //			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
 //			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 //			FakeConfig:      basicConfigMock(),
 //			FakeMPM: &marketplace.MarketplaceInterfaceMock{
@@ -998,7 +1000,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 //	}
 //}
 
-func getKcr(status keycloak.KeycloakRealmStatus) *keycloak.KeycloakRealm {
+func getKcr(status keycloak.KeycloakRealmStatus, name string) *keycloak.KeycloakRealm {
 	return &keycloak.KeycloakRealm{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      masterRealmName,
