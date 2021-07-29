@@ -389,7 +389,14 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 	}
 
 	if (integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(installation.Spec.Type))) {
-		r.reconcileTenants(ctx, serverClient, r.Config.GetNamespace())
+		users := &usersv1.UserList{}
+		users, err := userHelper.GetMultiTenantUsers2(ctx, serverClient)
+		if err != nil {
+			r.Log.Error("Error getting multi tenant users", err)
+			return integreatlyv1alpha1.PhaseFailed, nil
+		}
+
+		r.reconcileTenants(ctx, serverClient, r.Config.GetNamespace(), users)
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling multi tenant users: %w", err)
 		}
@@ -459,25 +466,17 @@ func (r *Reconciler) reconcileAdminUsers(ctx context.Context, serverClient k8scl
 	return integreatlyv1alpha1.PhaseCompleted, nil
 }
 
-func (r *Reconciler) reconcileTenants(ctx context.Context, serverClient k8sclient.Client, ns string) (integreatlyv1alpha1.StatusPhase, error) {
-
-	users := &usersv1.UserList{}
-	users, err := userHelper.GetMultiTenantUsers2(ctx, serverClient)
-	if err != nil {
-		r.Log.Error("Error getting multi tenant users", err)
-		return integreatlyv1alpha1.PhaseFailed, nil
-	}
+func (r *Reconciler) reconcileTenants(ctx context.Context, serverClient k8sclient.Client, ns string, users usersv1.UserList) (integreatlyv1alpha1.StatusPhase, error) {
 
 	options := &k8sclient.ListOptions{
 		Namespace: ns,
 	}
 	realms := &keycloak.KeycloakRealmList{}
-	err = serverClient.List(ctx, realms, options)
+	err := serverClient.List(ctx, realms, options)
 	if err != nil {
 		return integreatlyv1alpha1.PhaseFailed, nil
 	}
 
-	// TODO: get user diff, added / deleted
 	added, deleted := getTenantDiff(users.Items, realms.Items)
 
 	for _, user := range added {
@@ -607,7 +606,7 @@ func (r *Reconciler) createTenantKCUser(ctx context.Context, serverClient k8scli
 					UserName:         user.Name,
 				},
 			},
-			ClientRoles: getTenantClientRoles("realm-managers"),
+			ClientRoles: getTenantClientRoles("realm-management"),
 			RealmRoles: []string{"offline_access", "uma_authorization"},
 		}
 

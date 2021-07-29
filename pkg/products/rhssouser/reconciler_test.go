@@ -238,6 +238,24 @@ func setupRecorder() record.EventRecorder {
 //	}
 //}
 
+func getUser(name string) usersv1.User {
+	return usersv1.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       name,
+			UID:                        "123",
+		},
+	}
+}
+
+func getAddedUsers() usersv1.UserList {
+	return usersv1.UserList{
+		Items:     []usersv1.User{
+			getUser("user1"),
+			getUser("user2"),
+		},
+	}
+}
+
 func TestReconciler_reconcileTenants(t *testing.T) {
 	scheme, err := getBuildScheme()
 	if err != nil {
@@ -277,6 +295,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 		FakeMPM               *marketplace.MarketplaceInterfaceMock
 		Recorder              record.EventRecorder
 		ApiUrl                string
+		Users		    	  usersv1.UserList
 		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
 		ProductConfig         *quota.ProductConfigMock
 	}{
@@ -297,6 +316,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 					Type: "multitenant-managed-api",
 				},
 			},
+			Users: 				   getAddedUsers(),
 			ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
 			Recorder:              setupRecorder(),
 			ApiUrl:                "https://serverurl",
@@ -307,33 +327,6 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 				},
 			},
 		},
-		//{
-		//	Name:            "Test reconcile tenant kcrealm and tenant kcuser deletion",
-		//	FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, kcr, kc),
-		//	FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
-		//	FakeConfig:      basicConfigMock(),
-		//	Installation: &integreatlyv1alpha1.RHMI{
-		//		TypeMeta: metav1.TypeMeta{
-		//			Kind:       "RHMI",
-		//			APIVersion: integreatlyv1alpha1.GroupVersion.String(),
-		//		},
-		//		ObjectMeta: controllerruntime.ObjectMeta{
-		//			Namespace: defaultOperatorNamespace,
-		//		},
-		//		Spec:       integreatlyv1alpha1.RHMISpec{
-		//			Type: "multitenant-managed-api",
-		//		},
-		//	},
-		//	ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
-		//	Recorder:              setupRecorder(),
-		//	ApiUrl:                "https://serverurl",
-		//	KeycloakClientFactory: getMoqKeycloakClientFactory(),
-		//	ProductConfig: &quota.ProductConfigMock{
-		//		ConfigureFunc: func(obj metav1.Object) error {
-		//			return nil
-		//		},
-		//	},
-		//},
 	}
 
 	for _, tc := range cases {
@@ -352,7 +345,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 			if err != nil {
 				t.Fatal("unexpected err ", err)
 			}
-			phase, err := reconciler.reconcileTenants(context.TODO(), tc.FakeClient, "redhat-rhoam-user-sso")
+			phase, err := reconciler.reconcileTenants(context.TODO(), tc.FakeClient, "redhat-rhoam-user-sso", tc.Users)
 			if tc.ExpectError && err == nil {
 				t.Fatal("expected an error but got none")
 			}
