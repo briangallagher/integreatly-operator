@@ -5,8 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	croTypes "github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1/types"
+	"github.com/integr8ly/integreatly-operator/pkg/client"
+	"github.com/integr8ly/integreatly-operator/pkg/resources"
 	"github.com/integr8ly/integreatly-operator/pkg/resources/quota"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"strconv"
 	"testing"
 
 	l "github.com/integr8ly/integreatly-operator/pkg/resources/logger"
@@ -42,7 +48,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var (
@@ -256,36 +261,82 @@ func getAddedUsers() usersv1.UserList {
 	}
 }
 
+
+
+
 func TestReconciler_reconcileTenants(t *testing.T) {
+
+	var createKcRealmCalls = 0
+	var createKcUserCalls = 0
+	var deleteKcRealmCalls = 0
+	var deleteKcUserCalls = 0
+
 	scheme, err := getBuildScheme()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	getSigClient := func(preReqObjects []runtime.Object, scheme *runtime.Scheme) *client.SigsClientInterfaceMock {
+		sigsFakeClient := client.NewSigsClientMoqWithScheme(scheme, preReqObjects...)
+		sigsFakeClient.CreateFunc = func(ctx context.Context, obj runtime.Object, opts ...k8sclient.CreateOption) error {
+		switch obj.(type) {
+			case *keycloak.KeycloakRealm:
+				createKcRealmCalls++
+				//return sigsFakeClient.GetSigsClient().Create(ctx, obj)
+				return nil
+			case *keycloak.KeycloakUser:
+				createKcUserCalls++
+				//return sigsFakeClient.GetSigsClient().Create(ctx, obj)
+				return nil
+			}
+			return sigsFakeClient.GetSigsClient().Create(ctx, obj)
+		}
+		sigsFakeClient.DeleteFunc = func(ctx context.Context, obj runtime.Object, opts ...k8sclient.DeleteOption) error {
+			//switch obj := obj.(type) {
+			switch obj.(type) {
+			case *keycloak.KeycloakRealm:
+				deleteKcRealmCalls++
+				//return sigsFakeClient.GetSigsClient().Delete(ctx, obj)
+				return nil
+			case *keycloak.KeycloakUser:
+				deleteKcUserCalls++
+				//return sigsFakeClient.GetSigsClient().Delete(ctx, obj)
+				return nil
+			}
+			return sigsFakeClient.GetSigsClient().Delete(ctx, obj)
+		}
+		return sigsFakeClient
+	}
+
+
 	oauthClientSecrets := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "oauth-client-secrets",
+			Name:      "tenant-oauth-client-secrets",
 			Namespace: defaultOperatorNamespace,
 		},
 		Data: map[string][]byte{
-			"rhssouser": bytes.NewBufferString("test").Bytes(),
+			"user2": bytes.NewBufferString("test").Bytes(),
+			"user1": bytes.NewBufferString("test").Bytes(),
 		},
 	}
+
+	var kcr1 = getKcr(keycloak.KeycloakRealmStatus{
+		Phase: keycloak.PhaseReconciling,
+	}, "user1")
+	var kcr2 = getKcr(keycloak.KeycloakRealmStatus{
+		Phase: keycloak.PhaseReconciling,
+	}, "user2")
 
 	kcrs := keycloak.KeycloakRealmList{
-		Items:    []keycloak.KeycloakRealm{
-			*getKcr(keycloak.KeycloakRealmStatus{
-				Phase: keycloak.PhaseReconciling,
-			}, "user1"),
-			*getKcr(keycloak.KeycloakRealmStatus{
-				Phase: keycloak.PhaseReconciling,
-			}, "user2"),
-		},
+		Items:    []keycloak.KeycloakRealm{},
 	}
 
-	//getKcr(keycloak.KeycloakRealmStatus{
-	//	Phase: keycloak.PhaseReconciling,
-	//}, "user1")
+	kcrs2 := keycloak.KeycloakRealmList{
+		Items:    []keycloak.KeycloakRealm{
+			*kcr1,
+			*kcr2,
+		},
+	}
 
 	kc := &keycloak.Keycloak{
 		ObjectMeta: metav1.ObjectMeta{
@@ -300,9 +351,7 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 		FakeOauthClient       oauthClient.OauthV1Interface
 		FakeConfig            *config.ConfigReadWriterMock
 		Installation          *integreatlyv1alpha1.RHMI
-		ExpectError           bool
-		ExpectedError         string
-		ExpectedStatus        integreatlyv1alpha1.StatusPhase
+		AssertFunc            func()
 		FakeMPM               *marketplace.MarketplaceInterfaceMock
 		Recorder              record.EventRecorder
 		ApiUrl                string
@@ -311,8 +360,8 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 		ProductConfig         *quota.ProductConfigMock
 	}{
 		{
-			Name:            "Test reconcile tenant kcrealm and tenant kcuser creation",
-			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, &kcrs, kc),
+			Name:            "Test reconcile tenant kcrealm and kcuser creation",
+			FakeClient:      getSigClient([]runtime.Object{oauthClientSecrets, &kcrs, kc}, scheme),
 			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
 			FakeConfig:      basicConfigMock(),
 			Installation: &integreatlyv1alpha1.RHMI{
@@ -328,7 +377,43 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 				},
 			},
 			Users: 				   getAddedUsers(),
-			ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
+			AssertFunc:            func() {
+				if createKcRealmCalls != 2 || createKcUserCalls != 2 {
+					t.Fatal("expected createKcRealm: ", strconv.Itoa(createKcRealmCalls), " and createKcUser: ", strconv.Itoa(createKcUserCalls), " to be called twice each")
+				}
+			},
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+		{
+			Name:            "Test reconcile tenant kcrealm and kcuser deletion",
+			FakeClient:      getSigClient([]runtime.Object{oauthClientSecrets, &kcrs2, kc}, scheme),
+			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
+			FakeConfig:      basicConfigMock(),
+			Installation: &integreatlyv1alpha1.RHMI{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "RHMI",
+					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+				},
+				ObjectMeta: controllerruntime.ObjectMeta{
+					Namespace: defaultOperatorNamespace,
+				},
+				Spec:       integreatlyv1alpha1.RHMISpec{
+					Type: "multitenant-managed-api",
+				},
+			},
+			Users: 				   usersv1.UserList{},
+			AssertFunc:        	   func() {
+				if deleteKcRealmCalls != 2 || deleteKcUserCalls != 2 {
+					t.Fatal("expected deleteKcRealm: ", strconv.Itoa(deleteKcRealmCalls), " and deleteKcUser: ", strconv.Itoa(deleteKcUserCalls), " to be called twice each")
+				}
+			},
 			Recorder:              setupRecorder(),
 			ApiUrl:                "https://serverurl",
 			KeycloakClientFactory: getMoqKeycloakClientFactory(),
@@ -356,7 +441,167 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 			if err != nil {
 				t.Fatal("unexpected err ", err)
 			}
-			phase, err := reconciler.reconcileTenants(context.TODO(), tc.FakeClient, "redhat-rhoam-user-sso", tc.Users)
+			reconciler.reconcileTenants(context.TODO(), tc.FakeClient, "redhat-rhoam-user-sso", tc.Users)
+			tc.AssertFunc()
+		})
+	}
+}
+
+func TestReconciler_reconcileComponents(t *testing.T) {
+	scheme, err := getBuildScheme()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kc := &keycloak.Keycloak{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      keycloakName,
+			Namespace: defaultNamespace,
+		},
+	}
+
+	group := &usersv1.Group{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dedicated-admins",
+		},
+		Users: nil,
+	}
+
+	kcr := getKcr(keycloak.KeycloakRealmStatus{
+		Phase: keycloak.PhaseReconciling,
+	}, masterRealmName)
+
+	githubOauthSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "github-oauth-secret",
+			Namespace: defaultOperatorNamespace,
+		},
+	}
+
+	oauthClientSecrets := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-client-secrets",
+			Namespace: defaultOperatorNamespace,
+		},
+		Data: map[string][]byte{
+			"rhssouser": bytes.NewBufferString("test").Bytes(),
+		},
+	}
+
+	//completed postgres that points at the secret croPostgresSecret
+	croPostgres := &crov1.Postgres{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rhssouser-postgres-",
+			Namespace: defaultOperatorNamespace,
+		},
+		Status: croTypes.ResourceTypeStatus{
+			Phase: croTypes.PhaseComplete,
+			SecretRef: &croTypes.SecretRef{
+				Name:      "test",
+				Namespace: defaultOperatorNamespace,
+			},
+		},
+	}
+
+	//secret created by the cloud resource operator postgres reconciler
+	croPostgresSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: defaultOperatorNamespace,
+		},
+		Data: map[string][]byte{},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	cases := []struct {
+		Name                  string
+		FakeClient            k8sclient.Client
+		FakeOauthClient       oauthClient.OauthV1Interface
+		FakeConfig            *config.ConfigReadWriterMock
+		Installation          *integreatlyv1alpha1.RHMI
+		ExpectError           bool
+		ExpectedError         string
+		ExpectedStatus        integreatlyv1alpha1.StatusPhase
+		FakeMPM               *marketplace.MarketplaceInterfaceMock
+		Recorder              record.EventRecorder
+		ApiUrl                string
+		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
+		ProductConfig         *quota.ProductConfigMock
+	}{
+		{
+			Name:            "Test reconcile custom resource returns completed when successful created",
+			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, githubOauthSecret, kcr, kc, group, croPostgres, croPostgresSecret),
+			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
+			FakeConfig:      basicConfigMock(),
+			Installation: &integreatlyv1alpha1.RHMI{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "RHMI",
+					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+				},
+				ObjectMeta: controllerruntime.ObjectMeta{
+					Namespace: defaultOperatorNamespace,
+				},
+			},
+			ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+		{
+			Name: "Test reconcile custom resource returns failed on unsuccessful create",
+			FakeClient: &moqclient.SigsClientInterfaceMock{
+				CreateFunc: func(ctx context.Context, obj runtime.Object, opts ...k8sclient.CreateOption) error {
+					return errors.New("failed to create keycloak custom resource")
+				},
+				GetFunc: func(ctx context.Context, key types.NamespacedName, obj runtime.Object) error {
+					return k8serr.NewNotFound(schema.GroupResource{}, "keycloak")
+				},
+			},
+			FakeConfig: basicConfigMock(),
+			Installation: &integreatlyv1alpha1.RHMI{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "RHMI",
+					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+				},
+				ObjectMeta: controllerruntime.ObjectMeta{
+					Namespace: defaultOperatorNamespace,
+				},
+			},
+			ExpectError:           true,
+			ExpectedError:         "failed to create/update keycloak custom resource: failed to create keycloak custom resource",
+			ExpectedStatus:        integreatlyv1alpha1.PhaseFailed,
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			reconciler, err := NewReconciler(
+				tc.FakeConfig,
+				tc.Installation,
+				tc.FakeOauthClient,
+				tc.FakeMPM,
+				tc.Recorder,
+				tc.ApiUrl,
+				tc.KeycloakClientFactory,
+				getLogger(),
+				localProductDeclaration,
+			)
+			if err != nil {
+				t.Fatal("unexpected err ", err)
+			}
+			phase, err := reconciler.reconcileComponents(context.TODO(), tc.Installation, tc.FakeClient, tc.ProductConfig)
 			if tc.ExpectError && err == nil {
 				t.Fatal("expected an error but got none")
 			}
@@ -374,646 +619,474 @@ func TestReconciler_reconcileTenants(t *testing.T) {
 	}
 }
 
-//func TestReconciler_reconcileComponents(t *testing.T) {
-//	scheme, err := getBuildScheme()
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	kc := &keycloak.Keycloak{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      keycloakName,
-//			Namespace: defaultNamespace,
-//		},
-//	}
-//
-//	group := &usersv1.Group{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: "dedicated-admins",
-//		},
-//		Users: nil,
-//	}
-//
-//	kcr := getKcr(keycloak.KeycloakRealmStatus{
-//		Phase: keycloak.PhaseReconciling,
-//	}, masterRealmName)
-//
-//	githubOauthSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "github-oauth-secret",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//	}
-//
-//	oauthClientSecrets := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "oauth-client-secrets",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//		Data: map[string][]byte{
-//			"rhssouser": bytes.NewBufferString("test").Bytes(),
-//		},
-//	}
-//
-//	//completed postgres that points at the secret croPostgresSecret
-//	croPostgres := &crov1.Postgres{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "rhssouser-postgres-",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//		Status: croTypes.ResourceTypeStatus{
-//			Phase: croTypes.PhaseComplete,
-//			SecretRef: &croTypes.SecretRef{
-//				Name:      "test",
-//				Namespace: defaultOperatorNamespace,
-//			},
-//		},
-//	}
-//
-//	//secret created by the cloud resource operator postgres reconciler
-//	croPostgresSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "test",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//		Data: map[string][]byte{},
-//		Type: corev1.SecretTypeOpaque,
-//	}
-//
-//	cases := []struct {
-//		Name                  string
-//		FakeClient            k8sclient.Client
-//		FakeOauthClient       oauthClient.OauthV1Interface
-//		FakeConfig            *config.ConfigReadWriterMock
-//		Installation          *integreatlyv1alpha1.RHMI
-//		ExpectError           bool
-//		ExpectedError         string
-//		ExpectedStatus        integreatlyv1alpha1.StatusPhase
-//		FakeMPM               *marketplace.MarketplaceInterfaceMock
-//		Recorder              record.EventRecorder
-//		ApiUrl                string
-//		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
-//		ProductConfig         *quota.ProductConfigMock
-//	}{
-//		{
-//			Name:            "Test reconcile custom resource returns completed when successful created",
-//			FakeClient:      fakeclient.NewFakeClientWithScheme(scheme, oauthClientSecrets, githubOauthSecret, kcr, kc, group, croPostgres, croPostgresSecret),
-//			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
-//			FakeConfig:      basicConfigMock(),
-//			Installation: &integreatlyv1alpha1.RHMI{
-//				TypeMeta: metav1.TypeMeta{
-//					Kind:       "RHMI",
-//					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
-//				},
-//				ObjectMeta: controllerruntime.ObjectMeta{
-//					Namespace: defaultOperatorNamespace,
-//				},
-//			},
-//			ExpectedStatus:        integreatlyv1alpha1.PhaseCompleted,
-//			Recorder:              setupRecorder(),
-//			ApiUrl:                "https://serverurl",
-//			KeycloakClientFactory: getMoqKeycloakClientFactory(),
-//			ProductConfig: &quota.ProductConfigMock{
-//				ConfigureFunc: func(obj metav1.Object) error {
-//					return nil
-//				},
-//			},
-//		},
-//		{
-//			Name: "Test reconcile custom resource returns failed on unsuccessful create",
-//			FakeClient: &moqclient.SigsClientInterfaceMock{
-//				CreateFunc: func(ctx context.Context, obj runtime.Object, opts ...k8sclient.CreateOption) error {
-//					return errors.New("failed to create keycloak custom resource")
-//				},
-//				GetFunc: func(ctx context.Context, key types.NamespacedName, obj runtime.Object) error {
-//					return k8serr.NewNotFound(schema.GroupResource{}, "keycloak")
-//				},
-//			},
-//			FakeConfig: basicConfigMock(),
-//			Installation: &integreatlyv1alpha1.RHMI{
-//				TypeMeta: metav1.TypeMeta{
-//					Kind:       "RHMI",
-//					APIVersion: integreatlyv1alpha1.GroupVersion.String(),
-//				},
-//				ObjectMeta: controllerruntime.ObjectMeta{
-//					Namespace: defaultOperatorNamespace,
-//				},
-//			},
-//			ExpectError:           true,
-//			ExpectedError:         "failed to create/update keycloak custom resource: failed to create keycloak custom resource",
-//			ExpectedStatus:        integreatlyv1alpha1.PhaseFailed,
-//			Recorder:              setupRecorder(),
-//			ApiUrl:                "https://serverurl",
-//			KeycloakClientFactory: getMoqKeycloakClientFactory(),
-//			ProductConfig: &quota.ProductConfigMock{
-//				ConfigureFunc: func(obj metav1.Object) error {
-//					return nil
-//				},
-//			},
-//		},
-//	}
-//	for _, tc := range cases {
-//		t.Run(tc.Name, func(t *testing.T) {
-//			reconciler, err := NewReconciler(
-//				tc.FakeConfig,
-//				tc.Installation,
-//				tc.FakeOauthClient,
-//				tc.FakeMPM,
-//				tc.Recorder,
-//				tc.ApiUrl,
-//				tc.KeycloakClientFactory,
-//				getLogger(),
-//				localProductDeclaration,
-//			)
-//			if err != nil {
-//				t.Fatal("unexpected err ", err)
-//			}
-//			phase, err := reconciler.reconcileComponents(context.TODO(), tc.Installation, tc.FakeClient, tc.ProductConfig)
-//			if tc.ExpectError && err == nil {
-//				t.Fatal("expected an error but got none")
-//			}
-//			if !tc.ExpectError && err != nil {
-//				t.Fatal("expected no error but got one ", err)
-//			}
-//			if err != nil && err.Error() != tc.ExpectedError {
-//				t.Fatalf("unexpected error : '%v', expected: '%v'", err, tc.ExpectedError)
-//			}
-//			if tc.ExpectedStatus != phase {
-//				t.Fatal("expected phase ", tc.ExpectedStatus, " but got ", phase)
-//			}
-//
-//		})
-//	}
-//}
+func TestReconciler_full_RHMI_Reconcile(t *testing.T) {
+	scheme, err := getBuildScheme()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-//func TestReconciler_full_RHMI_Reconcile(t *testing.T) {
-//	scheme, err := getBuildScheme()
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	installation := &integreatlyv1alpha1.RHMI{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:       "installation",
-//			Namespace:  defaultNamespace,
-//			Finalizers: []string{"finalizer.user-sso.integreatly.org"},
-//			UID:        types.UID("xyz"),
-//		},
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "RHMI",
-//			APIVersion: integreatlyv1alpha1.GroupVersion.String(),
-//		},
-//		Status: integreatlyv1alpha1.RHMIStatus{
-//			Stages: map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.RHMIStageStatus{
-//				"codeready-stage": {
-//					Name: "codeready-stage",
-//					Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
-//						integreatlyv1alpha1.ProductCodeReadyWorkspaces: {
-//							Name:   integreatlyv1alpha1.ProductCodeReadyWorkspaces,
-//							Status: integreatlyv1alpha1.PhaseCreatingComponents,
-//						},
-//					},
-//				},
-//			},
-//		},
-//	}
-//
-//	ns := &corev1.Namespace{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: defaultNamespace,
-//			Labels: map[string]string{
-//				resources.OwnerLabelKey: string(installation.GetUID()),
-//			},
-//		},
-//		Status: corev1.NamespaceStatus{
-//			Phase: corev1.NamespaceActive,
-//		},
-//	}
-//
-//	operatorNS := &corev1.Namespace{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: defaultNamespace + "-operator",
-//			Labels: map[string]string{
-//				resources.OwnerLabelKey: string(installation.GetUID()),
-//			},
-//		},
-//		Status: corev1.NamespaceStatus{
-//			Phase: corev1.NamespaceActive,
-//		},
-//	}
-//
-//	kc := &keycloak.Keycloak{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      keycloakName,
-//			Namespace: defaultNamespace,
-//		},
-//	}
-//
-//	secret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "test-secret",
-//			Namespace: defaultNamespace,
-//		},
-//	}
-//
-//	githubOauthSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "github-oauth-secret",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//	}
-//
-//	oauthClientSecrets := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "oauth-client-secrets",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//		Data: map[string][]byte{
-//			"rhssouser": bytes.NewBufferString("test").Bytes(),
-//		},
-//	}
-//
-//	edgeRoute := &routev1.Route{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "keycloak-edge",
-//			Namespace: "user-sso",
-//		},
-//		Spec: routev1.RouteSpec{
-//			Host: "sampleHost",
-//		},
-//	}
-//
-//	group := &usersv1.Group{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: "dedicated-admins",
-//		},
-//		Users: nil,
-//	}
-//
-//	//completed postgres that points at the secret croPostgresSecret
-//	croPostgres := &crov1.Postgres{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      fmt.Sprintf("rhssouser-postgres-%s", installation.Name),
-//			Namespace: defaultNamespace,
-//		},
-//		Status: croTypes.ResourceTypeStatus{
-//			Phase: croTypes.PhaseComplete,
-//			SecretRef: &croTypes.SecretRef{
-//				Name:      "test",
-//				Namespace: defaultNamespace,
-//			},
-//		},
-//	}
-//
-//	//secret created by the cloud resource operator postgres reconciler
-//	croPostgresSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "test",
-//			Namespace: defaultNamespace,
-//		},
-//		Data: map[string][]byte{},
-//		Type: corev1.SecretTypeOpaque,
-//	}
-//
-//	statefulSet := &appsv1.StatefulSet{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "keycloak",
-//			Namespace: defaultNamespace,
-//			Labels: map[string]string{
-//				"app": "keycloak",
-//			},
-//		},
-//	}
-//
-//	cases := []struct {
-//		Name                  string
-//		ExpectError           bool
-//		ExpectedStatus        integreatlyv1alpha1.StatusPhase
-//		ExpectedError         string
-//		FakeConfig            *config.ConfigReadWriterMock
-//		FakeClient            k8sclient.Client
-//		FakeOauthClient       oauthClient.OauthV1Interface
-//		FakeMPM               *marketplace.MarketplaceInterfaceMock
-//		Installation          *integreatlyv1alpha1.RHMI
-//		Product               *integreatlyv1alpha1.RHMIProductStatus
-//		Recorder              record.EventRecorder
-//		ApiUrl                string
-//		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
-//		ProductConfig         *quota.ProductConfigMock
-//	}{
-//		{
-//			Name:            "test successful reconcile",
-//			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
-//			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
-//			FakeConfig:      basicConfigMock(),
-//			FakeMPM: &marketplace.MarketplaceInterfaceMock{
-//				InstallOperatorFunc: func(ctx context.Context, serverClient k8sclient.Client, t marketplace.Target, operatorGroupNamespaces []string, approvalStrategy operatorsv1alpha1.Approval, catalogSourceReconciler marketplace.CatalogSourceReconciler) error {
-//
-//					return nil
-//				},
-//				GetSubscriptionInstallPlanFunc: func(ctx context.Context, serverClient k8sclient.Client, subName string, ns string) (plans *operatorsv1alpha1.InstallPlan, subscription *operatorsv1alpha1.Subscription, e error) {
-//					return &operatorsv1alpha1.InstallPlan{
-//							ObjectMeta: metav1.ObjectMeta{
-//								Name: "codeready-install-plan",
-//							},
-//							Status: operatorsv1alpha1.InstallPlanStatus{
-//								Phase: operatorsv1alpha1.InstallPlanPhaseComplete,
-//							},
-//						}, &operatorsv1alpha1.Subscription{
-//							Status: operatorsv1alpha1.SubscriptionStatus{
-//								Install: &operatorsv1alpha1.InstallPlanReference{
-//									Name: "codeready-install-plan",
-//								},
-//							},
-//						}, nil
-//				},
-//			},
-//			Installation:          installation,
-//			Product:               &integreatlyv1alpha1.RHMIProductStatus{},
-//			Recorder:              setupRecorder(),
-//			ApiUrl:                "https://serverurl",
-//			KeycloakClientFactory: getMoqKeycloakClientFactory(),
-//			ProductConfig: &quota.ProductConfigMock{
-//				ConfigureFunc: func(obj metav1.Object) error {
-//					return nil
-//				},
-//			},
-//		},
-//	}
-//
-//	for _, tc := range cases {
-//		t.Run(tc.Name, func(t *testing.T) {
-//			testReconciler, err := NewReconciler(
-//				tc.FakeConfig,
-//				tc.Installation,
-//				tc.FakeOauthClient,
-//				tc.FakeMPM,
-//				tc.Recorder,
-//				tc.ApiUrl,
-//				tc.KeycloakClientFactory,
-//				getLogger(),
-//				localProductDeclaration,
-//			)
-//			if err != nil && err.Error() != tc.ExpectedError {
-//				t.Fatalf("unexpected error : '%v', expected: '%v'", err, tc.ExpectedError)
-//			}
-//
-//			status, err := testReconciler.Reconcile(context.TODO(), tc.Installation, tc.Product, tc.FakeClient, tc.ProductConfig)
-//
-//			if err != nil && !tc.ExpectError {
-//				t.Fatalf("expected no errors, but got one: %v", err)
-//			}
-//
-//			if err == nil && tc.ExpectError {
-//				t.Fatal("expected error but got none")
-//			}
-//
-//			if status != tc.ExpectedStatus {
-//				t.Fatalf("Expected status: '%v', got: '%v'", tc.ExpectedStatus, status)
-//			}
-//		})
-//	}
-//}
+	installation := &integreatlyv1alpha1.RHMI{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "installation",
+			Namespace:  defaultNamespace,
+			Finalizers: []string{"finalizer.user-sso.integreatly.org"},
+			UID:        types.UID("xyz"),
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RHMI",
+			APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+		},
+		Status: integreatlyv1alpha1.RHMIStatus{
+			Stages: map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.RHMIStageStatus{
+				"codeready-stage": {
+					Name: "codeready-stage",
+					Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
+						integreatlyv1alpha1.ProductCodeReadyWorkspaces: {
+							Name:   integreatlyv1alpha1.ProductCodeReadyWorkspaces,
+							Status: integreatlyv1alpha1.PhaseCreatingComponents,
+						},
+					},
+				},
+			},
+		},
+	}
 
-//func TestReconciler_full_RHOAM_Reconcile(t *testing.T) {
-//	scheme, err := getBuildScheme()
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	installation := &integreatlyv1alpha1.RHMI{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:       "installation",
-//			Namespace:  defaultNamespace,
-//			Finalizers: []string{"finalizer.user-sso.integreatly.org"},
-//			UID:        types.UID("xyz"),
-//		},
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "RHMI",
-//			APIVersion: integreatlyv1alpha1.GroupVersion.String(),
-//		},
-//		Status: integreatlyv1alpha1.RHMIStatus{
-//			Stages: map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.RHMIStageStatus{
-//				"rhsso-stage": {
-//					Name: "rhsso-stage",
-//					Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
-//						integreatlyv1alpha1.ProductCodeReadyWorkspaces: {
-//							Name:   integreatlyv1alpha1.ProductRHSSO,
-//							Status: integreatlyv1alpha1.PhaseCreatingComponents,
-//						},
-//					},
-//				},
-//			},
-//		},
-//		Spec: integreatlyv1alpha1.RHMISpec{
-//			Type: string(integreatlyv1alpha1.InstallationTypeManagedApi),
-//		},
-//	}
-//
-//	ns := &corev1.Namespace{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: defaultNamespace,
-//			Labels: map[string]string{
-//				resources.OwnerLabelKey: string(installation.GetUID()),
-//			},
-//		},
-//		Status: corev1.NamespaceStatus{
-//			Phase: corev1.NamespaceActive,
-//		},
-//	}
-//
-//	operatorNS := &corev1.Namespace{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: defaultNamespace + "-operator",
-//			Labels: map[string]string{
-//				resources.OwnerLabelKey: string(installation.GetUID()),
-//			},
-//		},
-//		Status: corev1.NamespaceStatus{
-//			Phase: corev1.NamespaceActive,
-//		},
-//	}
-//
-//	kc := &keycloak.Keycloak{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      keycloakName,
-//			Namespace: defaultNamespace,
-//		},
-//	}
-//
-//	secret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "test-secret",
-//			Namespace: defaultNamespace,
-//		},
-//	}
-//
-//	githubOauthSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "github-oauth-secret",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//	}
-//
-//	oauthClientSecrets := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "oauth-client-secrets",
-//			Namespace: defaultOperatorNamespace,
-//		},
-//		Data: map[string][]byte{
-//			"rhssouser": bytes.NewBufferString("test").Bytes(),
-//		},
-//	}
-//
-//	edgeRoute := &routev1.Route{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "keycloak",
-//			Namespace: "user-sso",
-//		},
-//		Spec: routev1.RouteSpec{
-//			Host: "sampleHost",
-//		},
-//	}
-//
-//	group := &usersv1.Group{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: "dedicated-admins",
-//		},
-//		Users: nil,
-//	}
-//
-//	//completed postgres that points at the secret croPostgresSecret
-//	croPostgres := &crov1.Postgres{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      fmt.Sprintf("rhssouser-postgres-%s", installation.Name),
-//			Namespace: defaultNamespace,
-//		},
-//		Status: croTypes.ResourceTypeStatus{
-//			Phase: croTypes.PhaseComplete,
-//			SecretRef: &croTypes.SecretRef{
-//				Name:      "test",
-//				Namespace: defaultNamespace,
-//			},
-//		},
-//	}
-//
-//	//secret created by the cloud resource operator postgres reconciler
-//	croPostgresSecret := &corev1.Secret{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "test",
-//			Namespace: defaultNamespace,
-//		},
-//		Data: map[string][]byte{},
-//		Type: corev1.SecretTypeOpaque,
-//	}
-//
-//	statefulSet := &appsv1.StatefulSet{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "keycloak",
-//			Namespace: defaultNamespace,
-//			Labels: map[string]string{
-//				"app": "keycloak",
-//			},
-//		},
-//	}
-//
-//	cases := []struct {
-//		Name                  string
-//		ExpectError           bool
-//		ExpectedStatus        integreatlyv1alpha1.StatusPhase
-//		ExpectedError         string
-//		FakeConfig            *config.ConfigReadWriterMock
-//		FakeClient            k8sclient.Client
-//		FakeOauthClient       oauthClient.OauthV1Interface
-//		FakeMPM               *marketplace.MarketplaceInterfaceMock
-//		Installation          *integreatlyv1alpha1.RHMI
-//		Product               *integreatlyv1alpha1.RHMIProductStatus
-//		Recorder              record.EventRecorder
-//		ApiUrl                string
-//		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
-//		ProductConfig         *quota.ProductConfigMock
-//	}{
-//		{
-//			Name:            "RHOAM - test successful reconcile",
-//			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
-//			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
-//			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
-//			FakeConfig:      basicConfigMock(),
-//			FakeMPM: &marketplace.MarketplaceInterfaceMock{
-//				InstallOperatorFunc: func(ctx context.Context, serverClient k8sclient.Client, t marketplace.Target, operatorGroupNamespaces []string, approvalStrategy operatorsv1alpha1.Approval, catalogSourceReconciler marketplace.CatalogSourceReconciler) error {
-//
-//					return nil
-//				},
-//				GetSubscriptionInstallPlanFunc: func(ctx context.Context, serverClient k8sclient.Client, subName string, ns string) (plans *operatorsv1alpha1.InstallPlan, subscription *operatorsv1alpha1.Subscription, e error) {
-//					return &operatorsv1alpha1.InstallPlan{
-//							ObjectMeta: metav1.ObjectMeta{
-//								Name: "codeready-install-plan",
-//							},
-//							Status: operatorsv1alpha1.InstallPlanStatus{
-//								Phase: operatorsv1alpha1.InstallPlanPhaseComplete,
-//							},
-//						}, &operatorsv1alpha1.Subscription{
-//							Status: operatorsv1alpha1.SubscriptionStatus{
-//								Install: &operatorsv1alpha1.InstallPlanReference{
-//									Name: "codeready-install-plan",
-//								},
-//							},
-//						}, nil
-//				},
-//			},
-//			Installation:          installation,
-//			Product:               &integreatlyv1alpha1.RHMIProductStatus{},
-//			Recorder:              setupRecorder(),
-//			ApiUrl:                "https://serverurl",
-//			KeycloakClientFactory: getMoqKeycloakClientFactory(),
-//			ProductConfig: &quota.ProductConfigMock{
-//				ConfigureFunc: func(obj metav1.Object) error {
-//					return nil
-//				},
-//			},
-//		},
-//	}
-//
-//	for _, tc := range cases {
-//		t.Run(tc.Name, func(t *testing.T) {
-//			testReconciler, err := NewReconciler(
-//				tc.FakeConfig,
-//				tc.Installation,
-//				tc.FakeOauthClient,
-//				tc.FakeMPM,
-//				tc.Recorder,
-//				tc.ApiUrl,
-//				tc.KeycloakClientFactory,
-//				getLogger(),
-//				localProductDeclaration,
-//			)
-//			if err != nil && err.Error() != tc.ExpectedError {
-//				t.Fatalf("unexpected error : '%v', expected: '%v'", err, tc.ExpectedError)
-//			}
-//
-//			status, err := testReconciler.Reconcile(context.TODO(), tc.Installation, tc.Product, tc.FakeClient, tc.ProductConfig)
-//
-//			if err != nil && !tc.ExpectError {
-//				t.Fatalf("expected no errors, but got one: %v", err)
-//			}
-//
-//			if err == nil && tc.ExpectError {
-//				t.Fatal("expected error but got none")
-//			}
-//
-//			if status != tc.ExpectedStatus {
-//				t.Fatalf("Expected status: '%v', got: '%v'", tc.ExpectedStatus, status)
-//			}
-//		})
-//	}
-//}
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultNamespace,
+			Labels: map[string]string{
+				resources.OwnerLabelKey: string(installation.GetUID()),
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+
+	operatorNS := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultNamespace + "-operator",
+			Labels: map[string]string{
+				resources.OwnerLabelKey: string(installation.GetUID()),
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+
+	kc := &keycloak.Keycloak{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      keycloakName,
+			Namespace: defaultNamespace,
+		},
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: defaultNamespace,
+		},
+	}
+
+	githubOauthSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "github-oauth-secret",
+			Namespace: defaultOperatorNamespace,
+		},
+	}
+
+	oauthClientSecrets := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-client-secrets",
+			Namespace: defaultOperatorNamespace,
+		},
+		Data: map[string][]byte{
+			"rhssouser": bytes.NewBufferString("test").Bytes(),
+		},
+	}
+
+	edgeRoute := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "keycloak-edge",
+			Namespace: "user-sso",
+		},
+		Spec: routev1.RouteSpec{
+			Host: "sampleHost",
+		},
+	}
+
+	group := &usersv1.Group{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dedicated-admins",
+		},
+		Users: nil,
+	}
+
+	//completed postgres that points at the secret croPostgresSecret
+	croPostgres := &crov1.Postgres{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("rhssouser-postgres-%s", installation.Name),
+			Namespace: defaultNamespace,
+		},
+		Status: croTypes.ResourceTypeStatus{
+			Phase: croTypes.PhaseComplete,
+			SecretRef: &croTypes.SecretRef{
+				Name:      "test",
+				Namespace: defaultNamespace,
+			},
+		},
+	}
+
+	//secret created by the cloud resource operator postgres reconciler
+	croPostgresSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: defaultNamespace,
+		},
+		Data: map[string][]byte{},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "keycloak",
+			Namespace: defaultNamespace,
+			Labels: map[string]string{
+				"app": "keycloak",
+			},
+		},
+	}
+
+	cases := []struct {
+		Name                  string
+		ExpectError           bool
+		ExpectedStatus        integreatlyv1alpha1.StatusPhase
+		ExpectedError         string
+		FakeConfig            *config.ConfigReadWriterMock
+		FakeClient            k8sclient.Client
+		FakeOauthClient       oauthClient.OauthV1Interface
+		FakeMPM               *marketplace.MarketplaceInterfaceMock
+		Installation          *integreatlyv1alpha1.RHMI
+		Product               *integreatlyv1alpha1.RHMIProductStatus
+		Recorder              record.EventRecorder
+		ApiUrl                string
+		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
+		ProductConfig         *quota.ProductConfigMock
+	}{
+		{
+			Name:            "test successful reconcile",
+			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
+			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
+			FakeConfig:      basicConfigMock(),
+			FakeMPM: &marketplace.MarketplaceInterfaceMock{
+				InstallOperatorFunc: func(ctx context.Context, serverClient k8sclient.Client, t marketplace.Target, operatorGroupNamespaces []string, approvalStrategy operatorsv1alpha1.Approval, catalogSourceReconciler marketplace.CatalogSourceReconciler) error {
+
+					return nil
+				},
+				GetSubscriptionInstallPlanFunc: func(ctx context.Context, serverClient k8sclient.Client, subName string, ns string) (plans *operatorsv1alpha1.InstallPlan, subscription *operatorsv1alpha1.Subscription, e error) {
+					return &operatorsv1alpha1.InstallPlan{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "codeready-install-plan",
+							},
+							Status: operatorsv1alpha1.InstallPlanStatus{
+								Phase: operatorsv1alpha1.InstallPlanPhaseComplete,
+							},
+						}, &operatorsv1alpha1.Subscription{
+							Status: operatorsv1alpha1.SubscriptionStatus{
+								Install: &operatorsv1alpha1.InstallPlanReference{
+									Name: "codeready-install-plan",
+								},
+							},
+						}, nil
+				},
+			},
+			Installation:          installation,
+			Product:               &integreatlyv1alpha1.RHMIProductStatus{},
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			testReconciler, err := NewReconciler(
+				tc.FakeConfig,
+				tc.Installation,
+				tc.FakeOauthClient,
+				tc.FakeMPM,
+				tc.Recorder,
+				tc.ApiUrl,
+				tc.KeycloakClientFactory,
+				getLogger(),
+				localProductDeclaration,
+			)
+			if err != nil && err.Error() != tc.ExpectedError {
+				t.Fatalf("unexpected error : '%v', expected: '%v'", err, tc.ExpectedError)
+			}
+
+			status, err := testReconciler.Reconcile(context.TODO(), tc.Installation, tc.Product, tc.FakeClient, tc.ProductConfig)
+
+			if err != nil && !tc.ExpectError {
+				t.Fatalf("expected no errors, but got one: %v", err)
+			}
+
+			if err == nil && tc.ExpectError {
+				t.Fatal("expected error but got none")
+			}
+
+			if status != tc.ExpectedStatus {
+				t.Fatalf("Expected status: '%v', got: '%v'", tc.ExpectedStatus, status)
+			}
+		})
+	}
+}
+
+func TestReconciler_full_RHOAM_Reconcile(t *testing.T) {
+	scheme, err := getBuildScheme()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	installation := &integreatlyv1alpha1.RHMI{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "installation",
+			Namespace:  defaultNamespace,
+			Finalizers: []string{"finalizer.user-sso.integreatly.org"},
+			UID:        types.UID("xyz"),
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RHMI",
+			APIVersion: integreatlyv1alpha1.GroupVersion.String(),
+		},
+		Status: integreatlyv1alpha1.RHMIStatus{
+			Stages: map[integreatlyv1alpha1.StageName]integreatlyv1alpha1.RHMIStageStatus{
+				"rhsso-stage": {
+					Name: "rhsso-stage",
+					Products: map[integreatlyv1alpha1.ProductName]integreatlyv1alpha1.RHMIProductStatus{
+						integreatlyv1alpha1.ProductCodeReadyWorkspaces: {
+							Name:   integreatlyv1alpha1.ProductRHSSO,
+							Status: integreatlyv1alpha1.PhaseCreatingComponents,
+						},
+					},
+				},
+			},
+		},
+		Spec: integreatlyv1alpha1.RHMISpec{
+			Type: string(integreatlyv1alpha1.InstallationTypeManagedApi),
+		},
+	}
+
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultNamespace,
+			Labels: map[string]string{
+				resources.OwnerLabelKey: string(installation.GetUID()),
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+
+	operatorNS := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultNamespace + "-operator",
+			Labels: map[string]string{
+				resources.OwnerLabelKey: string(installation.GetUID()),
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+
+	kc := &keycloak.Keycloak{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      keycloakName,
+			Namespace: defaultNamespace,
+		},
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: defaultNamespace,
+		},
+	}
+
+	githubOauthSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "github-oauth-secret",
+			Namespace: defaultOperatorNamespace,
+		},
+	}
+
+	oauthClientSecrets := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-client-secrets",
+			Namespace: defaultOperatorNamespace,
+		},
+		Data: map[string][]byte{
+			"rhssouser": bytes.NewBufferString("test").Bytes(),
+		},
+	}
+
+	edgeRoute := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "keycloak",
+			Namespace: "user-sso",
+		},
+		Spec: routev1.RouteSpec{
+			Host: "sampleHost",
+		},
+	}
+
+	group := &usersv1.Group{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dedicated-admins",
+		},
+		Users: nil,
+	}
+
+	//completed postgres that points at the secret croPostgresSecret
+	croPostgres := &crov1.Postgres{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("rhssouser-postgres-%s", installation.Name),
+			Namespace: defaultNamespace,
+		},
+		Status: croTypes.ResourceTypeStatus{
+			Phase: croTypes.PhaseComplete,
+			SecretRef: &croTypes.SecretRef{
+				Name:      "test",
+				Namespace: defaultNamespace,
+			},
+		},
+	}
+
+	//secret created by the cloud resource operator postgres reconciler
+	croPostgresSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: defaultNamespace,
+		},
+		Data: map[string][]byte{},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "keycloak",
+			Namespace: defaultNamespace,
+			Labels: map[string]string{
+				"app": "keycloak",
+			},
+		},
+	}
+
+	cases := []struct {
+		Name                  string
+		ExpectError           bool
+		ExpectedStatus        integreatlyv1alpha1.StatusPhase
+		ExpectedError         string
+		FakeConfig            *config.ConfigReadWriterMock
+		FakeClient            k8sclient.Client
+		FakeOauthClient       oauthClient.OauthV1Interface
+		FakeMPM               *marketplace.MarketplaceInterfaceMock
+		Installation          *integreatlyv1alpha1.RHMI
+		Product               *integreatlyv1alpha1.RHMIProductStatus
+		Recorder              record.EventRecorder
+		ApiUrl                string
+		KeycloakClientFactory keycloakCommon.KeycloakClientFactory
+		ProductConfig         *quota.ProductConfigMock
+	}{
+		{
+			Name:            "RHOAM - test successful reconcile",
+			ExpectedStatus:  integreatlyv1alpha1.PhaseCompleted,
+			FakeClient:      moqclient.NewSigsClientMoqWithScheme(scheme, getKcr(keycloak.KeycloakRealmStatus{Phase: keycloak.PhaseReconciling}, masterRealmName), kc, secret, ns, operatorNS, githubOauthSecret, oauthClientSecrets, installation, edgeRoute, group, croPostgresSecret, croPostgres, getRHSSOCredentialSeed(), statefulSet),
+			FakeOauthClient: fakeoauthClient.NewSimpleClientset([]runtime.Object{}...).OauthV1(),
+			FakeConfig:      basicConfigMock(),
+			FakeMPM: &marketplace.MarketplaceInterfaceMock{
+				InstallOperatorFunc: func(ctx context.Context, serverClient k8sclient.Client, t marketplace.Target, operatorGroupNamespaces []string, approvalStrategy operatorsv1alpha1.Approval, catalogSourceReconciler marketplace.CatalogSourceReconciler) error {
+
+					return nil
+				},
+				GetSubscriptionInstallPlanFunc: func(ctx context.Context, serverClient k8sclient.Client, subName string, ns string) (plans *operatorsv1alpha1.InstallPlan, subscription *operatorsv1alpha1.Subscription, e error) {
+					return &operatorsv1alpha1.InstallPlan{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "codeready-install-plan",
+							},
+							Status: operatorsv1alpha1.InstallPlanStatus{
+								Phase: operatorsv1alpha1.InstallPlanPhaseComplete,
+							},
+						}, &operatorsv1alpha1.Subscription{
+							Status: operatorsv1alpha1.SubscriptionStatus{
+								Install: &operatorsv1alpha1.InstallPlanReference{
+									Name: "codeready-install-plan",
+								},
+							},
+						}, nil
+				},
+			},
+			Installation:          installation,
+			Product:               &integreatlyv1alpha1.RHMIProductStatus{},
+			Recorder:              setupRecorder(),
+			ApiUrl:                "https://serverurl",
+			KeycloakClientFactory: getMoqKeycloakClientFactory(),
+			ProductConfig: &quota.ProductConfigMock{
+				ConfigureFunc: func(obj metav1.Object) error {
+					return nil
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			testReconciler, err := NewReconciler(
+				tc.FakeConfig,
+				tc.Installation,
+				tc.FakeOauthClient,
+				tc.FakeMPM,
+				tc.Recorder,
+				tc.ApiUrl,
+				tc.KeycloakClientFactory,
+				getLogger(),
+				localProductDeclaration,
+			)
+			if err != nil && err.Error() != tc.ExpectedError {
+				t.Fatalf("unexpected error : '%v', expected: '%v'", err, tc.ExpectedError)
+			}
+
+			status, err := testReconciler.Reconcile(context.TODO(), tc.Installation, tc.Product, tc.FakeClient, tc.ProductConfig)
+
+			if err != nil && !tc.ExpectError {
+				t.Fatalf("expected no errors, but got one: %v", err)
+			}
+
+			if err == nil && tc.ExpectError {
+				t.Fatal("expected error but got none")
+			}
+
+			if status != tc.ExpectedStatus {
+				t.Fatalf("Expected status: '%v', got: '%v'", tc.ExpectedStatus, status)
+			}
+		})
+	}
+}
 
 func getKcr(status keycloak.KeycloakRealmStatus, name string) *keycloak.KeycloakRealm {
 	return &keycloak.KeycloakRealm{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: defaultNamespace,
+			Namespace: "redhat-rhoam-user-sso",
 		},
 		Spec: keycloak.KeycloakRealmSpec{
 			Realm: &keycloak.KeycloakAPIRealm{
