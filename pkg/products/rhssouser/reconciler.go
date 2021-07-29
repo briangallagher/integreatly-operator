@@ -396,7 +396,7 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, installation *inte
 			return integreatlyv1alpha1.PhaseFailed, nil
 		}
 
-		r.reconcileTenants(ctx, serverClient, r.Config.GetNamespace(), users)
+		r.reconcileTenants(ctx, serverClient, r.Config.GetNamespace(), *users)
 		if err != nil {
 			return integreatlyv1alpha1.PhaseFailed, fmt.Errorf("Error reconciling multi tenant users: %w", err)
 		}
