@@ -459,7 +459,6 @@ func (r *Reconciler) retrieveConsoleURLAndSubdomain(ctx context.Context, serverC
 	r.installation.Spec.RoutingSubdomain = strings.TrimPrefix(r.installation.Spec.RoutingSubdomain, "router-default.")
 
 	return integreatlyv1alpha1.PhaseCompleted, nil
-
 }
 
 func getConsoleRouteCR(ctx context.Context, serverClient k8sclient.Client) (*routev1.Route, error) {

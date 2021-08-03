@@ -255,8 +255,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, installation *integreatlyv1a
 		return phase, err
 	}
 
-	if err := r.reconcileConsoleLink(ctx, serverClient); err != nil {
-		return integreatlyv1alpha1.PhaseFailed, err
+	if (integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(installation.Spec.Type))) {
+		if err := r.reconcileTenantDashboardLinks(ctx, serverClient); err != nil {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
+	} else {
+		if err := r.reconcileConsoleLink(ctx, serverClient); err != nil {
+			return integreatlyv1alpha1.PhaseFailed, err
+		}
 	}
 
 	product.Host = r.Config.GetHost()
@@ -1508,10 +1514,59 @@ func listClientsByName(kcClient keycloakCommon.KeycloakInterface, realmName stri
 	return clientsByID, nil
 }
 
+func (r *Reconciler)reconcileTenantDashboardLinks(ctx context.Context, serverClient k8sclient.Client) error {
+
+	users := &usersv1.UserList{}
+	users, err := userHelper.GetMultiTenantUsers2(ctx, serverClient)
+	if err != nil {
+		r.Log.Error("Error getting multi tenant users", err)
+		return err
+	}
+
+	for _, user := range users.Items {
+		tenantLink := r.Config.GetHost() + "/auth/admin/" + user.Name + "/console/"
+		tenantNs := user.Name + "-dev"
+		if err := r.reconcileDashboardLink(ctx, serverClient, tenantLink, tenantNs); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Reconciler)reconcileDashboardLink(ctx context.Context, serverClient k8sclient.Client, tenantLink string, tenantNs string) error {
+	cl := &consolev1.ConsoleLink{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tenantLink,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, serverClient, cl, func() error {
+		cl.Spec = consolev1.ConsoleLinkSpec{
+			Location: consolev1.ApplicationMenu,
+			Link: consolev1.Link{
+				Href: r.Config.GetHost() + "/auth/admin/tes/console/",
+				Text: "API Management SSO",
+			},
+			NamespaceDashboard: &consolev1.NamespaceDashboardSpec {
+				Namespaces:        []string {tenantNs},
+			},
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error reconciling console link: %v", err)
+	}
+
+	return nil
+}
+
 func (r *Reconciler) reconcileConsoleLink(ctx context.Context, serverClient k8sclient.Client) error {
 	// If the installation type isn't managed-api, ensure that the ConsoleLink
 	// doesn't exist
-	if !integreatlyv1alpha1.IsRHOAM(integreatlyv1alpha1.InstallationType(r.Installation.Spec.Type)) {
+	if !integreatlyv1alpha1.IsRHOAM(integreatlyv1alpha1.InstallationType(r.Installation.Spec.Type)) ||
+		integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(r.Installation.Spec.Type)) {
 		return r.deleteConsoleLink(ctx, serverClient)
 	}
 
