@@ -1,6 +1,6 @@
 include ./make/*.mk
 
-ORG ?= integreatly
+ORG ?= bgallagher
 
 REG=quay.io
 SHELL=/bin/bash
@@ -31,7 +31,7 @@ SANDBOX_NAMESPACE ?= sandbox-rhoam-operator
 
 # These tags are modified by the prepare-release script.
 RHMI_TAG ?= 2.9.0
-RHOAM_TAG ?= 1.12.0
+RHOAM_TAG ?= v1.12.0-ds1
 
 export SKIP_FLAKES := true
 
