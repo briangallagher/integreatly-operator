@@ -675,7 +675,6 @@ func (r *Reconciler) reconcileComponents(ctx context.Context, serverClient k8scl
 			"threescale_component":         "apicast",
 			"threescale_component_element": "staging",
 		})
-
 		apim.Spec.Backend.ListenerSpec.Affinity = resources.SelectAntiAffinityForCluster(antiAffinityRequired, map[string]string{
 			"threescale_component":         "backend",
 			"threescale_component_element": "listener",

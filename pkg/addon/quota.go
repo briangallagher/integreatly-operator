@@ -2,6 +2,7 @@ package addon
 
 import (
 	integreatlyv1alpha1 "github.com/integr8ly/integreatly-operator/apis/v1alpha1"
+	"github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -578,7 +579,20 @@ var mtQuotaConfig = `
                     },
                     "limits":{
                         "cpu":1,
-                        "memory":"1400Mi"
+                        "memory":"3000Mi"
+                    }
+                }
+            },
+            "system_app":{
+                "replicas":5,
+                "resources":{
+                    "requests":{
+                        "cpu":0.5,
+                        "memory":"700Mi"
+                    },
+                    "limits":{
+                        "cpu":1,
+                        "memory":"1200Mi"
                     }
                 }
             },
@@ -692,9 +706,12 @@ var mtQuotaConfig = `
 `
 
 func GetQuotaConfig(installType string) string {
+	logrus.Info("GetQuotaConfig")
 	if integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(installType)) {
+		logrus.Info("Returning mt Quota")
 		return strings.TrimSpace(mtQuotaConfig)
 	} else {
+		logrus.Info("Returning single quota")
 		return strings.TrimSpace(quotaConfig)
 	}
 }

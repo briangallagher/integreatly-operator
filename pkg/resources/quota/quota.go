@@ -23,6 +23,7 @@ const (
 	RateLimitName         = "ratelimit"
 	BackendListenerName   = "backend_listener"
 	BackendWorkerName     = "backend_worker"
+	SystemApp     		  = "system_app"
 	ApicastProductionName = "apicast_production"
 	ApicastStagingName    = "apicast_staging"
 	KeycloakName          = "rhssouser"
@@ -37,6 +38,7 @@ var (
 			BackendWorkerName,
 			ApicastProductionName,
 			ApicastStagingName,
+			SystemApp,
 		},
 		v1alpha1.ProductRHSSOUser: {
 			KeycloakName,
@@ -211,6 +213,11 @@ func (p QuotaProductConfig) Configure(obj metav1.Object) error {
 		p.mutateAPIManagerReplicas(t.Spec.Backend.WorkerSpec.Replicas, BackendWorkerName)
 		p.mutateResourcesRequirement(t.Spec.Backend.WorkerSpec.Resources, BackendWorkerName)
 
+		p.mutateAPIManagerReplicas(t.Spec.System.AppSpec.Replicas, SystemApp)
+		p.mutateResourcesRequirement(t.Spec.System.AppSpec.ProviderContainerResources, SystemApp)
+		p.mutateResourcesRequirement(t.Spec.System.AppSpec.DeveloperContainerResources, SystemApp)
+		p.mutateResourcesRequirement(t.Spec.System.AppSpec.MasterContainerResources, SystemApp)
+
 	default:
 		return errors.New(fmt.Sprintf("quota configuration can only be applied to Deployments, StatefulSets, Deployment Configs, ApiManager, Keycloak found %s", reflect.TypeOf(obj)))
 	}
@@ -261,6 +268,11 @@ func (p QuotaProductConfig) mutateReplicas(replicas *int32, name string) {
 }
 
 func (p QuotaProductConfig) mutateResourcesRequirement(resourceRequirements *corev1.ResourceRequirements, name string) {
+
+	configs := p.resourceConfigs[name]
+	if configs.Resources.Requests == nil {
+		return
+	}
 	resources := p.resourceConfigs[name].Resources
 
 	if resourceRequirements == nil {

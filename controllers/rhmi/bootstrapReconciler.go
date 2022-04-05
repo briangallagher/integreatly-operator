@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math/rand"
 	"os"
 	"strconv"
@@ -766,6 +767,7 @@ func getSecretQuotaParam(installation *rhmiv1alpha1.RHMI, serverClient k8sclient
 	}
 
 	if found && quotaParam != "" {
+		logrus.Info("Found it")
 		return quotaParam, nil
 	}
 
