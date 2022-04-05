@@ -66,6 +66,19 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+      - description: APIManagementTenant is the Schema for the rhoamconfigs API
+        displayName: APIManagementTenant
+        kind: APIManagementTenant
+        name: rhmiconfigs.integreatly.org
+        resources:
+          - kind: ConfigMap
+            name: rhoam-config
+            version: v1
+        statusDescriptors:
+          - description: The status of each of the RHMI Config CR
+            displayName: RHMI Config CR Status
+            path: status
+        version: v1alpha1
       - description: RHOAMConfig is the Schema for the rhoamconfigs API
         displayName: RHOAMConfig
         kind: RHMIConfig
