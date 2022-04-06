@@ -518,7 +518,7 @@ spec:
                       - rhmi-operator
                     env:
                       - name: INSTALLATION_TYPE
-                        value: managed-api
+                        value: multitenant-managed-api
                       - name: WATCH_NAMESPACE
                         valueFrom:
                           fieldRef:
