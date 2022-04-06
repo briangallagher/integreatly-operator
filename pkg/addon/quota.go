@@ -564,7 +564,7 @@ var mtQuotaConfig = `
         "param":"10",
         "rate-limiting":{
             "unit":"minute",
-            "requests_per_unit":695,
+            "requests_per_unit":2000,
             "alert_limits":[
                 
             ]
@@ -706,7 +706,7 @@ var mtQuotaConfig = `
 `
 
 func GetQuotaConfig(installType string) string {
-	logrus.Info("GetQuotaConfig")
+	logrus.Info("GetQuotaConfig " + installType)
 	if integreatlyv1alpha1.IsRHOAMMultitenant(integreatlyv1alpha1.InstallationType(installType)) {
 		logrus.Info("Returning mt Quota")
 		return strings.TrimSpace(mtQuotaConfig)
