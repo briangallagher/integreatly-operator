@@ -732,7 +732,6 @@ spec:
   maturity: alpha
   provider:
     name: rhoam
-  replaces: managed-api-service.v1.20.1
   selector:
     matchLabels:
       alm-owner-rhoam: rhoam-operator
