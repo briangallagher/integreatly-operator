@@ -316,7 +316,6 @@ spec:
           - console.openshift.io
           resources:
           - consolelinks
-          verbs:olm.targetNamespaces
           - create
           - delete
           - get
